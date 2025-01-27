@@ -7,3 +7,5 @@ shadow_model.py
 data/
 catboost_info/
 assets/
+# all pycache
+__pycache__/
