@@ -1,0 +1,44 @@
+# Hyperparameters for the model
+
+dataset:
+  name: CIFAR10
+  root: "./data"
+  download: true
+  train_batch_size: 256
+  eval_batch_size: 512
+  num_workers: 2
+  input_size: 32
+
+model:
+  architecture: resnet18
+  pretrained: true
+  num_classes: 10
+
+training:
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.00001
+  early_stop_patience: 10
+  train_subset_size: 5000
+  eval_subset_size: 5000
+
+shadow:
+  num_shadow_models: 64
+  shadow_train_size: 2500
+  shadow_eval_size: 2500
+  shadow_test_size: 2500
+
+
+attack:
+  output_dim: 10
+  catboost:
+    iterations: 200
+    depth: 2
+    learning_rate: 0.25
+    loss_function: "Logloss"
+    verbose: true
+  
+paths:
+  model_save_dir: "./models"
+  attack_save_dir: "./attack"
+  asset_dir: "./assets"
