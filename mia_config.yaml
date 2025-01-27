@@ -1,4 +1,4 @@
-# Hyperparameters for the model
+# MIA Hyperparameters
 
 dataset:
   name: CIFAR10

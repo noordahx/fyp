@@ -10,7 +10,7 @@ import os
 
 def main():
     # 1. Load config.
-    config = load_config("config.yaml")
+    config = load_config("mia_config.yaml")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 2. Get dataset.
