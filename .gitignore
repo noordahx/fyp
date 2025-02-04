@@ -9,3 +9,6 @@ catboost_info/
 assets/
 # all pycache
 __pycache__/
+attack/
+shadow_models/
+shadow_indices/
