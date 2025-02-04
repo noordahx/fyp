@@ -12,3 +12,13 @@ Target Models](https://arxiv.org/pdf/2210.16258)
 
 Code Stolen from [this implementation](https://github.com/yonsei-sslab/MIA)
 
+
+[MIA-repo](https://github.com/HongshengHu/membership-inference-machine-learning-literature)
+
+[OSLO](https://arxiv.org/pdf/2007.14321)
+[Label-only](https://github.com/cchoquette/membership-inference)
+*** [membership-inference-evaluation](https://github.com/inspire-group/membership-inference-evaluation)
+*** [LDC_MIA](https://github.com/horanshi/LDC-MIA)
+*** [Quantile-MIA](https://github.com/amazon-science/quantile-mia)
+*** [Enhanced-MIA](https://arxiv.org/pdf/2111.09679)
+[Subpopulation based MIA](https://arxiv.org/pdf/2203.02080)
