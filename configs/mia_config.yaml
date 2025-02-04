@@ -38,6 +38,13 @@ attack:
     loss_function: "Logloss"
     verbose: true
   
+  method: oslo
+
+  oslo:
+    epsilon: 0.03
+    alpha: 0.005
+    steps: 10
+  
 paths:
   model_save_dir: "./models"
   attack_save_dir: "./attack"

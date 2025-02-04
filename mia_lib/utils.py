@@ -1,5 +1,10 @@
 # utility functions (early stopping classes, metics, etc.)
 
+import numpy as np
+import torch
+from tqdm import tqdm
+
+
 class EarlyStopPatience:
     def __init__(self, patience=10):
         self.patience = patience
@@ -20,3 +25,4 @@ class EarlyStopPatience:
         if self.counter >= self.patience:
             return True
         return False
+    
