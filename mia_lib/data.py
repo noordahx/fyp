@@ -55,6 +55,7 @@ def create_subset_dataloader(dataset, indices, batch_size, shuffle, num_workers)
         subset,
         batch_size=batch_size,
         shuffle=shuffle,
-        num_workers=num_workers
+        num_workers=num_workers,
+        drop_last=True
     )
     return loader
