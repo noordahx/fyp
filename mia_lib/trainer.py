@@ -18,7 +18,7 @@ def train_model(model, train_loader, val_loader, config, device, save_path):
     early_stop = EarlyStopPatience(config["training"]["early_stop_patience"])
 
     best_valid_acc = 0.0
-    beat_valis_loss = float('inf')
+    best_valid_loss = float('inf')
 
     for epoch in range(epochs):
         # Train
@@ -42,12 +42,11 @@ def train_model(model, train_loader, val_loader, config, device, save_path):
         total_loss, correct = 0.0, 0
         with torch.no_grad():
             for images, labels in val_loader:
-                for images, labels in val_loader:
-                    images, labels = images.to(device), labels.to(device)
-                    outputs = model(images)
-                    loss = criterion(outputs, labels)
-                    total_loss += loss.item()
-                    correct += (outputs.argmax(1) == labels).sum().item()
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                total_loss += loss.item()
+                correct += (outputs.argmax(1) == labels).sum().item()
         
         val_loss = total_loss / len(val_loader)
         val_acc = correct / len(val_loader.dataset)

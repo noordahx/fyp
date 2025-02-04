@@ -18,7 +18,7 @@ training:
   epochs: 100
   lr: 0.001
   weight_decay: 0.00001
-  early_stop_patience: 10
+  early_stop_patience: 20
   train_subset_size: 5000
   eval_subset_size: 5000
 
@@ -41,4 +41,6 @@ attack:
 paths:
   model_save_dir: "./models"
   attack_save_dir: "./attack"
-  asset_dir: "./assets"
+  assets_dir: "./assets"
+  shadow_model_save_dir: "./shadow_models"
+  shadow_indices_save_dir: "./shadow_indices"

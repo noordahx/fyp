@@ -21,7 +21,7 @@ def train_attack_model(df_attack, config):
 
     cat_config = config["attack"]["catboost"]
     model = CatBoostClassifier(
-        iterations=cat_config["interations"],
+        iterations=cat_config["iterations"],
         depth=cat_config["depth"],
         learning_rate=cat_config["learning_rate"],
         loss_function=cat_config["loss_function"],
@@ -57,16 +57,17 @@ def train_attack_model(df_attack, config):
     plt.ylabel("True Positive Rate")
     plt.title("Membership Inference Attack - ROC Curve")
     plt.legend(loc="lower right")
-    plt.savefig(os.path.join(assets_dir, "roc_curve.png"))
+    plt.savefig(os.path.join(assets_dir, f"roc_curve_{model.__class__.__name__}_{accuracy:.4f}.png"))
     plt.close()
+    print(f"[Attack Model] ROC curve saved to {assets_dir}")
 
     # Save model
     attack_model_path = os.path.join(
-        config["paths"]["model_save_dir"],
+        config["paths"]["attack_save_dir"],
         f"catboost_attack_{model.__class__.__name__}_{accuracy:.4f}"
     )
 
     model.save_model(attack_model_path)
-    print(f"Attack model saved to {attack_model_path}")
+    print(f"[Attack Model] Saved to {attack_model_path}")
 
     return model
