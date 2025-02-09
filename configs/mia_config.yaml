@@ -44,6 +44,9 @@ attack:
     epsilon: 0.03
     alpha: 0.005
     steps: 10
+
+reference:
+  ref_train_size: 5000
   
 paths:
   model_save_dir: "./models"
