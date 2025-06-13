@@ -10,6 +10,7 @@ Usage:
     python scripts/train_with_dp.py --method dp_sgd_opacus --dataset cifar10 --epsilon 1.0
     python scripts/train_with_dp.py --method pate --dataset mnist --num-teachers 5
     python scripts/train_with_dp.py --method standard --dataset cifar10  # baseline
+    python scripts/train_with_dp.py --method output_perturbation --dataset cifar10 --epsilon 1.0
 """
 
 import argparse
