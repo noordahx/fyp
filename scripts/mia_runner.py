@@ -9,6 +9,7 @@ Usage:
     python scripts/mia_runner.py --model results/model.pt --dataset cifar10 --attack shadow
     python scripts/mia_runner.py --model results/model.pt --dataset mnist --attack reference
     python scripts/mia_runner.py --model results/model.pt --dataset cifar10 --attack loo
+    python scripts/mia_runner.py --model results/model.pt.0.pt --dataset mnist --attack all --attack-size 500 --num-shadows 2 --shadow-epochs 5
 """
 
 import argparse
@@ -141,31 +142,56 @@ def evaluate_attack_performance(predictions, labels, save_path=None):
 
 
 def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, output_dir, args):
-    """Run simplified shadow model attack."""
-    logger.info("Running simplified shadow model attack...")
+    """Run enhanced shadow model attack with multiple features."""
+    logger.info("Running enhanced shadow model attack...")
     
-    # Create simple shadow models
-    shadow_models = []
-    shadow_predictions = []
+    # Collect shadow training data
+    shadow_features = []
     shadow_labels = []
     
-    # Train a few simple shadow models
+    # Train shadow models
     for i in range(args.num_shadows):
         logger.info(f"Training shadow model {i+1}/{args.num_shadows}")
         
-        # Create model
-        shadow_model = create_model(args.num_classes, pretrained=False)
+        # Create model with same architecture as target
+        input_channels = 1 if 'mnist' in str(args.dataset).lower() else 3
+        shadow_model = create_model(args.num_classes, pretrained=False, input_channels=input_channels)
         shadow_model = shadow_model.to(device)
         
-        # Create shadow training data (subset of original)
-        shadow_size = min(len(train_dataset) // args.num_shadows, 5000)
-        shadow_indices = np.random.choice(len(train_dataset), shadow_size, replace=False)
-        shadow_train_data = Subset(train_dataset, shadow_indices)
-        shadow_train_loader = DataLoader(shadow_train_data, batch_size=128, shuffle=True)
+        # Create disjoint shadow training data
+        total_size = len(train_dataset) + len(test_dataset)
+        shadow_size = min(total_size // (args.num_shadows * 2), 3000)
         
-        # Train shadow model (simplified)
-        optimizer = torch.optim.Adam(shadow_model.parameters(), lr=0.001)
+        # Create shadow train/test splits
+        all_indices = list(range(len(train_dataset))) + [len(train_dataset) + i for i in range(len(test_dataset))]
+        shadow_train_indices = np.random.choice(all_indices, shadow_size, replace=False)
+        remaining_indices = [idx for idx in all_indices if idx not in shadow_train_indices]
+        shadow_test_indices = np.random.choice(remaining_indices, shadow_size, replace=False)
+        
+        # Create shadow datasets
+        shadow_train_samples = []
+        shadow_test_samples = []
+        
+        for idx in shadow_train_indices:
+            if idx < len(train_dataset):
+                shadow_train_samples.append(train_dataset[idx])
+            else:
+                shadow_test_samples.append(test_dataset[idx - len(train_dataset)])
+        
+        for idx in shadow_test_indices:
+            if idx < len(train_dataset):
+                shadow_test_samples.append(train_dataset[idx])
+            else:
+                shadow_test_samples.append(test_dataset[idx - len(train_dataset)])
+        
+        # Convert to proper datasets
+        shadow_train_loader = DataLoader(shadow_train_samples, batch_size=64, shuffle=True)
+        shadow_test_loader = DataLoader(shadow_test_samples, batch_size=64, shuffle=False)
+        
+        # Train shadow model with proper training loop
+        optimizer = torch.optim.Adam(shadow_model.parameters(), lr=0.001, weight_decay=1e-4)
         criterion = nn.CrossEntropyLoss()
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.7)
         
         for epoch in range(args.shadow_epochs):
             shadow_model.train()
@@ -176,72 +202,146 @@ def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, 
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
+            scheduler.step()
         
-        # Collect shadow model predictions
+        # Extract features from shadow model
         shadow_model.eval()
+        criterion_no_reduction = nn.CrossEntropyLoss(reduction='none')
+        
         with torch.no_grad():
-            # Member predictions (training data)
-            for batch_x, batch_y in DataLoader(shadow_train_data, batch_size=128):
-                batch_x = batch_x.to(device)
+            # Member features (shadow training data)
+            for batch_x, batch_y in shadow_train_loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
                 outputs = shadow_model(batch_x)
                 probs = torch.softmax(outputs, dim=1)
-                max_probs = torch.max(probs, dim=1)[0]
-                shadow_predictions.extend(max_probs.cpu().numpy())
-                shadow_labels.extend([1] * len(batch_x))  # Members
+                losses = criterion_no_reduction(outputs, batch_y)
+                
+                # Extract multiple features
+                for j in range(len(batch_x)):
+                    features = [
+                        float(torch.max(probs[j])),  # Max probability
+                        float(torch.sum(probs[j] ** 2)),  # Sum of squared probabilities  
+                        float(losses[j]),  # Cross-entropy loss
+                        float(torch.std(probs[j])),  # Standard deviation of probabilities
+                        float(probs[j][batch_y[j]]),  # Probability of true class
+                    ]
+                    shadow_features.append(features)
+                    shadow_labels.append(1)  # Member
             
-            # Non-member predictions (random test data)
-            test_subset_size = min(len(test_dataset), shadow_size)
-            test_indices = np.random.choice(len(test_dataset), test_subset_size, replace=False)
-            test_subset = Subset(test_dataset, test_indices)
-            for batch_x, batch_y in DataLoader(test_subset, batch_size=128):
-                batch_x = batch_x.to(device)
+            # Non-member features (shadow test data)
+            for batch_x, batch_y in shadow_test_loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
                 outputs = shadow_model(batch_x)
                 probs = torch.softmax(outputs, dim=1)
-                max_probs = torch.max(probs, dim=1)[0]
-                shadow_predictions.extend(max_probs.cpu().numpy())
-                shadow_labels.extend([0] * len(batch_x))  # Non-members
+                losses = criterion_no_reduction(outputs, batch_y)
+                
+                # Extract multiple features
+                for j in range(len(batch_x)):
+                    features = [
+                        float(torch.max(probs[j])),  # Max probability
+                        float(torch.sum(probs[j] ** 2)),  # Sum of squared probabilities  
+                        float(losses[j]),  # Cross-entropy loss
+                        float(torch.std(probs[j])),  # Standard deviation of probabilities
+                        float(probs[j][batch_y[j]]),  # Probability of true class
+                    ]
+                    shadow_features.append(features)
+                    shadow_labels.append(0)  # Non-member
     
-    # Train simple attack model using confidence scores
-    from sklearn.linear_model import LogisticRegression
+    # Train sophisticated attack model
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import train_test_split
     
-    X = np.array(shadow_predictions).reshape(-1, 1)
+    X = np.array(shadow_features)
     y = np.array(shadow_labels)
     
-    attack_model = LogisticRegression()
-    attack_model.fit(X, y)
+    # Split into train/test for attack model
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    
+    # Use Random Forest for better performance
+    attack_model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+    attack_model.fit(X_train, y_train)
+    
+    logger.info(f"Shadow attack model trained on {len(X_train)} samples")
+    logger.info(f"Shadow attack model validation accuracy: {attack_model.score(X_test, y_test):.4f}")
     
     # Evaluate on target model
-    member_dataset, non_member_dataset, _, _ = create_attack_splits(
+    member_dataset, non_member_dataset, member_indices, non_member_indices = create_attack_splits(
         train_dataset, list(range(len(train_dataset))), 
         list(range(len(test_dataset))), args.attack_size
     )
     
-    # Get target model predictions
-    target_predictions = []
+    # Extract features from target model
+    target_features = []
     target_labels = []
     
     target_model.eval()
+    criterion_no_reduction = nn.CrossEntropyLoss(reduction='none')
+    
     with torch.no_grad():
-        # Member predictions
-        for batch_x, batch_y in DataLoader(member_dataset, batch_size=128):
+        # Member features
+        member_loader = DataLoader(member_dataset, batch_size=128)
+        for i, (batch_x, batch_y) in enumerate(member_loader):
             batch_x = batch_x.to(device)
-            outputs = target_model(batch_x)
-            probs = torch.softmax(outputs, dim=1)
-            max_probs = torch.max(probs, dim=1)[0]
-            target_predictions.extend(max_probs.cpu().numpy())
-            target_labels.extend([1] * len(batch_x))
+            # Get true labels
+            start_idx = i * 128
+            end_idx = min(start_idx + 128, len(member_indices))
+            true_labels = []
+            for idx in range(start_idx, end_idx):
+                if idx < len(member_indices):
+                    orig_idx = member_indices[idx]
+                    _, true_label = train_dataset[orig_idx]
+                    true_labels.append(true_label)
+            
+            if true_labels:
+                true_labels = torch.tensor(true_labels, device=device)
+                outputs = target_model(batch_x[:len(true_labels)])
+                probs = torch.softmax(outputs, dim=1)
+                losses = criterion_no_reduction(outputs, true_labels)
+                
+                for j in range(len(true_labels)):
+                    features = [
+                        float(torch.max(probs[j])),
+                        float(torch.sum(probs[j] ** 2)),
+                        float(losses[j]),
+                        float(torch.std(probs[j])),
+                        float(probs[j][true_labels[j]]),
+                    ]
+                    target_features.append(features)
+                    target_labels.append(1)
         
-        # Non-member predictions
-        for batch_x, batch_y in DataLoader(non_member_dataset, batch_size=128):
+        # Non-member features
+        non_member_loader = DataLoader(non_member_dataset, batch_size=128)
+        for i, (batch_x, batch_y) in enumerate(non_member_loader):
             batch_x = batch_x.to(device)
-            outputs = target_model(batch_x)
-            probs = torch.softmax(outputs, dim=1)
-            max_probs = torch.max(probs, dim=1)[0]
-            target_predictions.extend(max_probs.cpu().numpy())
-            target_labels.extend([0] * len(batch_x))
+            # Get true labels
+            start_idx = i * 128
+            end_idx = min(start_idx + 128, len(non_member_indices))
+            true_labels = []
+            for idx in range(start_idx, end_idx):
+                if idx < len(non_member_indices):
+                    orig_idx = non_member_indices[idx]
+                    _, true_label = test_dataset[orig_idx]
+                    true_labels.append(true_label)
+            
+            if true_labels:
+                true_labels = torch.tensor(true_labels, device=device)
+                outputs = target_model(batch_x[:len(true_labels)])
+                probs = torch.softmax(outputs, dim=1)
+                losses = criterion_no_reduction(outputs, true_labels)
+                
+                for j in range(len(true_labels)):
+                    features = [
+                        float(torch.max(probs[j])),
+                        float(torch.sum(probs[j] ** 2)),
+                        float(losses[j]),
+                        float(torch.std(probs[j])),
+                        float(probs[j][true_labels[j]]),
+                    ]
+                    target_features.append(features)
+                    target_labels.append(0)
     
     # Attack target model
-    X_target = np.array(target_predictions).reshape(-1, 1)
+    X_target = np.array(target_features)
     attack_probs = attack_model.predict_proba(X_target)[:, 1]
     
     # Evaluate performance
@@ -294,6 +394,80 @@ def run_threshold_attack(target_model, train_dataset, test_dataset, device, outp
     return results
 
 
+def run_loss_based_attack(target_model, train_dataset, test_dataset, device, output_dir, args):
+    """Run loss-based membership inference attack."""
+    logger.info("Running loss-based attack...")
+    
+    member_dataset, non_member_dataset, member_indices, non_member_indices = create_attack_splits(
+        train_dataset, list(range(len(train_dataset))), 
+        list(range(len(test_dataset))), args.attack_size
+    )
+    
+    predictions = []
+    labels = []
+    
+    criterion = nn.CrossEntropyLoss(reduction='none')
+    target_model.eval()
+    
+    with torch.no_grad():
+        # Member losses (training data)
+        member_loader = DataLoader(member_dataset, batch_size=128)
+        for i, (batch_x, batch_y) in enumerate(member_loader):
+            batch_x = batch_x.to(device)
+            # Get corresponding true labels from original training data
+            start_idx = i * 128
+            end_idx = min(start_idx + 128, len(member_indices))
+            true_labels = []
+            for idx in range(start_idx, end_idx):
+                if idx < len(member_indices):
+                    orig_idx = member_indices[idx]
+                    _, true_label = train_dataset[orig_idx]
+                    true_labels.append(true_label)
+            
+            if true_labels:
+                true_labels = torch.tensor(true_labels, device=device)
+                outputs = target_model(batch_x[:len(true_labels)])
+                losses = criterion(outputs, true_labels)
+                # Lower loss = higher membership probability
+                # Convert to membership probability (invert loss)
+                max_loss = 10.0  # Reasonable upper bound for cross-entropy loss
+                membership_probs = 1.0 - torch.clamp(losses / max_loss, 0.0, 1.0)
+                predictions.extend(membership_probs.cpu().numpy())
+                labels.extend([1] * len(true_labels))
+        
+        # Non-member losses (test data)
+        non_member_loader = DataLoader(non_member_dataset, batch_size=128)
+        for i, (batch_x, batch_y) in enumerate(non_member_loader):
+            batch_x = batch_x.to(device)
+            # Get corresponding true labels from original test data
+            start_idx = i * 128
+            end_idx = min(start_idx + 128, len(non_member_indices))
+            true_labels = []
+            for idx in range(start_idx, end_idx):
+                if idx < len(non_member_indices):
+                    orig_idx = non_member_indices[idx]
+                    _, true_label = test_dataset[orig_idx]
+                    true_labels.append(true_label)
+            
+            if true_labels:
+                true_labels = torch.tensor(true_labels, device=device)
+                outputs = target_model(batch_x[:len(true_labels)])
+                losses = criterion(outputs, true_labels)
+                # Lower loss = higher membership probability
+                max_loss = 10.0  # Reasonable upper bound for cross-entropy loss
+                membership_probs = 1.0 - torch.clamp(losses / max_loss, 0.0, 1.0)
+                predictions.extend(membership_probs.cpu().numpy())
+                labels.extend([0] * len(true_labels))
+    
+    # Evaluate performance
+    results = evaluate_attack_performance(
+        np.array(predictions), np.array(labels),
+        output_dir / 'loss_attack'
+    )
+    
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description='Run membership inference attacks')
     
@@ -308,7 +482,7 @@ def main():
     
     # Attack arguments
     parser.add_argument('--attack', type=str, default='shadow',
-                       choices=['shadow', 'threshold', 'all'],
+                       choices=['shadow', 'threshold', 'loss', 'all'],
                        help='Type of attack to run')
     parser.add_argument('--attack-size', type=int, default=1000,
                        help='Number of samples for attack evaluation')
@@ -316,7 +490,7 @@ def main():
     # Shadow attack arguments
     parser.add_argument('--num-shadows', type=int, default=3,
                        help='Number of shadow models')
-    parser.add_argument('--shadow-epochs', type=int, default=5,
+    parser.add_argument('--shadow-epochs', type=int, default=8,
                        help='Epochs for shadow model training')
     
     # Output arguments
@@ -356,6 +530,12 @@ def main():
             target_model, train_dataset, test_dataset, device, output_dir, args
         )
         all_results['threshold'] = threshold_results
+    
+    if args.attack == 'loss' or args.attack == 'all':
+        loss_results = run_loss_based_attack(
+            target_model, train_dataset, test_dataset, device, output_dir, args
+        )
+        all_results['loss'] = loss_results
     
     # Save results
     results_file = output_dir / 'attack_results.json'
