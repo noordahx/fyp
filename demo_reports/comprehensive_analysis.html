@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Privacy Analysis Report - High_Risk_Model</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        .report-section {
+            margin: 30px 0;
+            text-align: center;
+        }
+        .report-image {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .metadata {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .metadata table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .metadata th, .metadata td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .metadata th {
+            background-color: #3498db;
+            color: white;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #bdc3c7;
+            color: #7f8c8d;
+        }
+        .risk-high { color: #e74c3c; font-weight: bold; }
+        .risk-medium { color: #f39c12; font-weight: bold; }
+        .risk-low { color: #27ae60; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 ML Privacy Analysis Report</h1>
+        <p style="text-align: center; font-size: 18px; color: #7f8c8d;">
+            Model: <strong>High_Risk_Model</strong> | 
+            Generated: <strong>2025-06-13 02:56:02</strong>
+        </p>
+        
+        <div class="metadata">
+            <h3>📊 Model Information</h3>
+            <table>
+                <tr><th>Property</th><th>Value</th></tr>
+                <tr><td>Dataset</td><td>CIFAR-10</td></tr>
+                <tr><td>Architecture</td><td>Large</td></tr>
+                <tr><td>Total Parameters</td><td>5,000,000</td></tr>
+                <tr><td>Training Samples</td><td>10,000</td></tr>
+                <tr><td>Test Samples</td><td>2,000</td></tr>
+                <tr><td>Training Epochs</td><td>100</td></tr>
+                <tr><td>Final Train Accuracy</td><td>100.00%</td></tr>
+                <tr><td>Final Test Accuracy</td><td>72.00%</td></tr>
+                <tr><td>Overfitting Gap</td><td>28.00%</td></tr>
+            </table>
+        </div>
+        
+        <div class="report-section">
+            <h2>📈 Executive Summary Dashboard</h2>
+            <img src="comprehensive_analysis_dashboard.png" alt="Summary Dashboard" class="report-image">
+        </div>
+        
+        <div class="report-section">
+            <h2>🎯 Training Analysis</h2>
+            <img src="comprehensive_analysis_training.png" alt="Training Report" class="report-image">
+        </div>
+        
+        <div class="report-section">
+            <h2>🔍 Membership Inference Attack Analysis</h2>
+            <img src="comprehensive_analysis_mia.png" alt="MIA Report" class="report-image">
+            
+            <div class="metadata">
+                <h3>🎯 Attack Results Summary</h3>
+                <table>
+                    <tr><th>Attack Type</th><th>AUC Score</th><th>Accuracy</th><th>Risk Level</th></tr>
+        
+                    <tr>
+                        <td>Threshold</td>
+                        <td>0.890</td>
+                        <td>0.850</td>
+                        <td class="risk-high">🔴 CRITICAL</td>
+                    </tr>
+            
+                    <tr>
+                        <td>Loss</td>
+                        <td>0.870</td>
+                        <td>0.820</td>
+                        <td class="risk-high">🔴 CRITICAL</td>
+                    </tr>
+            
+                </table>
+            </div>
+        </div>
+        
+        <div class="report-section">
+            <h2>🛡️ Differential Privacy Analysis</h2>
+            <img src="comprehensive_analysis_dp.png" alt="DP Report" class="report-image">
+        </div>
+            
+        <div class="metadata">
+            <h2>💡 Recommendations</h2>
+            <div style="text-align: left;">
+        
+                <h3 class="risk-high">🔴 CRITICAL PRIVACY RISK</h3>
+                <ul>
+                    <li><strong>Immediate Action Required:</strong> Apply differential privacy mechanisms</li>
+                    <li><strong>Model Architecture:</strong> Reduce model complexity and capacity</li>
+                    <li><strong>Data Access:</strong> Implement strict access controls and audit logs</li>
+                    <li><strong>Deployment:</strong> Consider federated learning or secure aggregation</li>
+                </ul>
+            
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>This report was automatically generated by the ML Privacy Analysis System.</p>
+            <p>For questions or concerns about privacy risks, consult with your security team.</p>
+        </div>
+    </div>
+</body>
+</html>
+        

@@ -1,0 +1,140 @@
+{
+  "configs": {
+    "cifar10_high_auc": {
+      "description": "CIFAR-10 configuration optimized for high MIA AUC",
+      "dataset": "cifar10",
+      "model_size": "medium",
+      "epochs": 80,
+      "batch_size": 256,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "train_size": 10000,
+      "test_size": 2000,
+      "eval_size": 2000,
+      "expected_auc": "> 0.8",
+      "gpu_memory_required": "4GB",
+      "training_time_estimate": "30-45 minutes"
+    },
+    
+    "cifar10_extreme_auc": {
+      "description": "CIFAR-10 configuration for extremely high MIA AUC",
+      "dataset": "cifar10",
+      "model_size": "large",
+      "epochs": 120,
+      "batch_size": 512,
+      "lr": 0.002,
+      "weight_decay": 0.0,
+      "train_size": 5000,
+      "test_size": 1000,
+      "eval_size": 2000,
+      "expected_auc": "> 0.9",
+      "gpu_memory_required": "8GB",
+      "training_time_estimate": "60-90 minutes"
+    },
+    
+    "cifar100_high_auc": {
+      "description": "CIFAR-100 configuration optimized for high MIA AUC",
+      "dataset": "cifar100",
+      "model_size": "large",
+      "epochs": 100,
+      "batch_size": 256,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "train_size": 15000,
+      "test_size": 3000,
+      "eval_size": 2000,
+      "expected_auc": "> 0.75",
+      "gpu_memory_required": "6GB",
+      "training_time_estimate": "45-60 minutes"
+    },
+    
+    "mnist_high_auc": {
+      "description": "MNIST configuration optimized for high MIA AUC",
+      "dataset": "mnist",
+      "model_size": "large",
+      "epochs": 60,
+      "batch_size": 512,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "train_size": 10000,
+      "test_size": 2000,
+      "eval_size": 2000,
+      "expected_auc": "> 0.85",
+      "gpu_memory_required": "2GB",
+      "training_time_estimate": "15-20 minutes"
+    },
+    
+    "quick_test": {
+      "description": "Quick test configuration for debugging",
+      "dataset": "cifar10",
+      "model_size": "small",
+      "epochs": 20,
+      "batch_size": 128,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "train_size": 2000,
+      "test_size": 500,
+      "eval_size": 1000,
+      "expected_auc": "> 0.6",
+      "gpu_memory_required": "2GB",
+      "training_time_estimate": "5-10 minutes"
+    },
+    
+    "production_ready": {
+      "description": "Production-ready configuration with full datasets",
+      "dataset": "cifar10",
+      "model_size": "medium",
+      "epochs": 100,
+      "batch_size": 512,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "train_size": null,
+      "test_size": null,
+      "eval_size": 5000,
+      "expected_auc": "> 0.7",
+      "gpu_memory_required": "8GB",
+      "training_time_estimate": "2-3 hours"
+    }
+  },
+  
+  "hardware_recommendations": {
+    "minimum": {
+      "gpu": "GTX 1060 6GB or equivalent",
+      "ram": "8GB",
+      "storage": "10GB free space"
+    },
+    "recommended": {
+      "gpu": "RTX 3070 8GB or equivalent",
+      "ram": "16GB",
+      "storage": "20GB free space"
+    },
+    "optimal": {
+      "gpu": "RTX 4090 24GB or A100 40GB",
+      "ram": "32GB",
+      "storage": "50GB free space"
+    }
+  },
+  
+  "optimization_tips": {
+    "for_high_auc": [
+      "Use smaller training datasets (5k-15k samples)",
+      "Train for more epochs (80-120)",
+      "Use larger models with more parameters",
+      "Set weight_decay to 0.0 (no regularization)",
+      "Use minimal data augmentation",
+      "Monitor overfitting gap (target >30%)"
+    ],
+    "for_gpu_efficiency": [
+      "Use larger batch sizes (256-512) on GPU",
+      "Enable pin_memory=True for faster data loading",
+      "Use mixed precision training for larger models",
+      "Monitor GPU memory usage with nvidia-smi"
+    ],
+    "for_reproducibility": [
+      "Set random seeds in the script",
+      "Use deterministic algorithms when possible",
+      "Save model checkpoints regularly",
+      "Log all hyperparameters and results"
+    ]
+  }
+} 

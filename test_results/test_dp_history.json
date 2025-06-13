@@ -1,0 +1,21 @@
+{
+  "history": {
+    "train_loss": [
+      900.2418767689439,
+      8423.099203514626
+    ],
+    "train_acc": [
+      9.964,
+      10.116
+    ],
+    "test_acc": [
+      9.04,
+      11.19
+    ]
+  },
+  "metadata": {
+    "method": "dp_sgd_custom",
+    "epsilon": 1.0,
+    "delta": 1e-05
+  }
+}
