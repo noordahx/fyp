@@ -448,7 +448,7 @@ def main():
     
     # Training arguments
     parser.add_argument('--method', type=str, default='standard',
-                       choices=['standard', 'dp_sgd_opacus', 'dp_sgd_custom', 
+                       choices=['standard', 'dp_sgd_custom', 
                                'pate', 'output_perturbation'],
                        help='Training method to use')
     parser.add_argument('--epochs', type=int, default=10,

@@ -15,6 +15,22 @@ from sklearn.metrics import (
 )
 
 
+def compute_accuracy(model, data_loader, device):
+    """Compute accuracy of a model on a given dataset."""
+    model.eval()
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for batch_x, batch_y in data_loader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            outputs = model(batch_x)
+            _, predicted = torch.max(outputs.data, 1)
+            total += batch_y.size(0)
+            correct += (predicted == batch_y).sum().item()
+    
+    return 100 * correct / total
+
 
 def seed_everything(seed):
     os.environ["PYTHONHASHSEED"] = str(seed)
