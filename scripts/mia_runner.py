@@ -40,11 +40,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_model(model_path, num_classes, device):
+def load_model(model_path, num_classes, device, dataset_name):
     """Load a trained model from checkpoint."""
     logger.info(f"Loading model from {model_path}")
     
-    model = create_model(num_classes, pretrained=False)
+    # Use same model architecture logic as training
+    input_channels = 1 if dataset_name == 'mnist' else 3
+    model = create_model(num_classes, pretrained=False, input_channels=input_channels)
     model = model.to(device)
     
     checkpoint = torch.load(model_path, map_location=device)
@@ -338,7 +340,7 @@ def main():
     logger.info(f"Dataset loaded: {len(train_dataset)} train, {len(test_dataset)} test")
     
     # Load target model
-    target_model = load_model(args.model, num_classes, device)
+    target_model = load_model(args.model, num_classes, device, args.dataset)
     
     # Run attacks
     all_results = {}

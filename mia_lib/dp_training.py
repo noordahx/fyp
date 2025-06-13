@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 class DPTrainer:
     """Differential Privacy Trainer supporting multiple DP methods."""
     
-    def __init__(self, num_classes: int, device: str, pretrained: bool = False):
+    def __init__(self, num_classes: int, device: str, pretrained: bool = False, input_channels: int = 3):
         self.num_classes = num_classes
         self.device = device
-        self.model = create_model(num_classes, pretrained=pretrained)
+        self.model = create_model(num_classes, pretrained=pretrained, input_channels=input_channels)
         self.model = self.model.to(device)
     
     def train_standard(self, train_loader: DataLoader, test_loader: DataLoader,
@@ -40,7 +40,7 @@ class DPTrainer:
         
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=epochs//3, gamma=0.1)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=max(1, epochs//3), gamma=0.1)
         
         history = {
             'train_loss': [], 'train_acc': [],

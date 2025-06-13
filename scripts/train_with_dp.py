@@ -33,9 +33,8 @@ from sklearn.metrics import roc_curve, precision_recall_curve
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from src.dp_training import DPTrainer, create_teacher_data_splits
-from mia_lib.models import create_model
-from mia_lib.attack import ShadowAttack, ThresholdAttack, LossBasedAttack
+from mia_lib.dp_training import DPTrainer, create_teacher_data_splits
+from mia_lib.data import get_dataset
 
 # Setup logging
 logging.basicConfig(
@@ -49,118 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_dataset(dataset_name: str, data_dir: str = './data'):
-    """
-    Load and return train/test datasets.
-    
-    Args:
-        dataset_name: Name of dataset ('cifar10', 'mnist', 'cifar100')
-        data_dir: Directory to store/load data
-        
-    Returns:
-        Tuple of (train_dataset, test_dataset, num_classes)
-    """
-    data_dir = Path(data_dir)
-    data_dir.mkdir(exist_ok=True)
-    
-    if dataset_name.lower() == 'cifar10':
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ])
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ])
-        
-        train_dataset = torchvision.datasets.CIFAR10(
-            root=data_dir, train=True, download=True, transform=transform_train
-        )
-        test_dataset = torchvision.datasets.CIFAR10(
-            root=data_dir, train=False, download=True, transform=transform_test
-        )
-        num_classes = 10
-        
-    elif dataset_name.lower() == 'mnist':
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])
-        
-        train_dataset = torchvision.datasets.MNIST(
-            root=data_dir, train=True, download=True, transform=transform
-        )
-        test_dataset = torchvision.datasets.MNIST(
-            root=data_dir, train=False, download=True, transform=transform
-        )
-        num_classes = 10
-        
-    elif dataset_name.lower() == 'cifar100':
-        transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        ])
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-        ])
-        
-        train_dataset = torchvision.datasets.CIFAR100(
-            root=data_dir, train=True, download=True, transform=transform_train
-        )
-        test_dataset = torchvision.datasets.CIFAR100(
-            root=data_dir, train=False, download=True, transform=transform_test
-        )
-        num_classes = 100
-        
-    else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}")
-    
-    return train_dataset, test_dataset, num_classes
 
-
-def create_simple_model(dataset_name: str, num_classes: int) -> nn.Module:
-    """
-    Create a simple model for the given dataset.
-    
-    Args:
-        dataset_name: Name of dataset
-        num_classes: Number of output classes
-        
-    Returns:
-        PyTorch model
-    """
-    if dataset_name.lower() == 'mnist':
-        return nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(28 * 28, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_classes)
-        )
-    else:  # CIFAR-10/100
-        return nn.Sequential(
-            nn.Conv2d(3, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Flatten(),
-            nn.Linear(64 * 8 * 8, 512),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(512, num_classes)
-        )
 
 
 def plot_training_metrics(history, save_dir, model_name):
@@ -220,218 +108,7 @@ def plot_training_metrics(history, save_dir, model_name):
     logger.info(f"Saved training metrics to {save_dir / f'training_metrics_{model_name}.png'}")
 
 
-def plot_privacy_utility_tradeoff(results, save_dir):
-    """Plot and save privacy-utility tradeoff curves."""
-    save_dir = Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Set style
-    plt.style.use('seaborn-v0_8' if 'seaborn-v0_8' in plt.style.available else 'seaborn')
-    sns.set_palette("husl")
-    
-    # Create figure with subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-    fig.suptitle('Privacy-Utility Tradeoff Analysis', fontsize=16)
-    
-    # Extract data
-    epsilons = sorted([float(k) for k in results.keys() if k != 'standard'])
-    model_accuracies = [results[str(eps)]['model_accuracy'] for eps in epsilons]
-    attack_accuracies = [results[str(eps)]['attack_accuracy'] for eps in epsilons]
-    attack_aucs = [results[str(eps)]['attack_auc'] for eps in epsilons]
-    
-    # Add standard model if available
-    if 'standard' in results:
-        epsilons.append(float('inf'))
-        model_accuracies.append(results['standard']['model_accuracy'])
-        attack_accuracies.append(results['standard']['attack_accuracy'])
-        attack_aucs.append(results['standard']['attack_auc'])
-    
-    # Plot model accuracy vs epsilon
-    ax1.semilogx(epsilons, model_accuracies, 'o-', label='Model Accuracy')
-    ax1.set_xlabel('Privacy Budget (ε)')
-    ax1.set_ylabel('Model Accuracy')
-    ax1.set_title('Model Performance vs Privacy Budget')
-    ax1.grid(True)
-    ax1.legend()
-    
-    # Plot attack metrics vs epsilon
-    ax2.semilogx(epsilons, attack_accuracies, 'o-', label='Attack Accuracy')
-    ax2.semilogx(epsilons, attack_aucs, 's-', label='Attack AUC')
-    ax2.set_xlabel('Privacy Budget (ε)')
-    ax2.set_ylabel('Attack Success Rate')
-    ax2.set_title('Attack Performance vs Privacy Budget')
-    ax2.grid(True)
-    ax2.legend()
-    
-    plt.tight_layout()
-    plt.savefig(save_dir / 'privacy_utility_tradeoff.png', dpi=300, bbox_inches='tight')
-    plt.close()
-    logger.info(f"Saved privacy-utility tradeoff to {save_dir / 'privacy_utility_tradeoff.png'}")
 
-
-def plot_attack_metrics_comparison(results, save_dir):
-    """Plot and save attack metrics comparison across different privacy levels."""
-    save_dir = Path(save_dir)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Extract data
-    data = []
-    for method, method_results in results.items():
-        epsilon = method if method != 'standard' else 'inf'
-        data.append({
-            'Method': f'ε={epsilon}',
-            'Model Accuracy': method_results['model_accuracy'],
-            'Attack Accuracy': method_results['attack_accuracy'],
-            'Attack AUC': method_results['attack_auc']
-        })
-    
-    df = pd.DataFrame(data)
-    
-    # Create subplots
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    fig.suptitle('Performance Comparison Across Privacy Levels', fontsize=16)
-    
-    # Model accuracy
-    sns.barplot(data=df, x='Method', y='Model Accuracy', ax=axes[0])
-    axes[0].set_title('Model Accuracy')
-    axes[0].tick_params(axis='x', rotation=45)
-    
-    # Attack accuracy
-    sns.barplot(data=df, x='Method', y='Attack Accuracy', ax=axes[1])
-    axes[1].set_title('Attack Accuracy')
-    axes[1].tick_params(axis='x', rotation=45)
-    
-    # Attack AUC
-    sns.barplot(data=df, x='Method', y='Attack AUC', ax=axes[2])
-    axes[2].set_title('Attack AUC')
-    axes[2].tick_params(axis='x', rotation=45)
-    
-    plt.tight_layout()
-    plt.savefig(save_dir / 'attack_metrics_comparison.png', dpi=300, bbox_inches='tight')
-    plt.close()
-    logger.info(f"Saved attack metrics comparison to {save_dir / 'attack_metrics_comparison.png'}")
-
-
-def create_dp_visualizations(training_history, attack_results, output_dir, model_name):
-    """Create and save all DP-related visualizations."""
-    logger.info("Creating DP visualizations...")
-    
-    viz_dir = Path(output_dir) / 'visualizations'
-    viz_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Plot training metrics
-    if training_history:
-        plot_training_metrics(training_history, viz_dir, model_name)
-    
-    # Plot privacy-utility tradeoff if we have multiple epsilon values
-    if len(attack_results) > 1:
-        plot_privacy_utility_tradeoff(attack_results, viz_dir)
-        plot_attack_metrics_comparison(attack_results, viz_dir)
-    
-    logger.info(f"DP visualizations saved to {viz_dir}")
-
-
-def run_membership_inference_attacks(model: nn.Module, train_loader: DataLoader,
-                                   test_loader: DataLoader, device: str,
-                                   output_dir: Path) -> dict:
-    """
-    Run membership inference attacks on the trained model.
-    
-    Args:
-        model: Trained model
-        train_loader: Training data loader
-        test_loader: Test data loader
-        device: Device to run on
-        output_dir: Directory to save results
-        
-    Returns:
-        Dictionary with attack results
-    """
-    logger.info("Running membership inference attacks...")
-    
-    results = {}
-    
-    # Threshold Attack
-    logger.info("Running Threshold Attack...")
-    threshold_attack = ThresholdAttack(device=device)
-    threshold_attack.calibrate_threshold(model, train_loader, test_loader)
-    
-    # Create combined loader for testing
-    combined_data = []
-    combined_labels = []
-    combined_targets = []
-    
-    # Add training samples (members)
-    for data, target in train_loader:
-        combined_data.append(data)
-        combined_targets.append(target)
-        combined_labels.extend([1] * len(data))  # 1 = member
-        
-    # Add test samples (non-members)  
-    for data, target in test_loader:
-        combined_data.append(data)
-        combined_targets.append(target)
-        combined_labels.extend([0] * len(data))  # 0 = non-member
-        
-    combined_data = torch.cat(combined_data)
-    combined_targets = torch.cat(combined_targets)
-    combined_labels = torch.tensor(combined_labels)
-    combined_dataset = torch.utils.data.TensorDataset(combined_data, combined_labels)
-    combined_loader = DataLoader(combined_dataset, batch_size=128, shuffle=False)
-    
-    threshold_results = threshold_attack.infer_membership(model, combined_loader)
-    results['threshold_attack'] = threshold_results
-    
-    # Loss-based Attack
-    logger.info("Running Loss-based Attack...")
-    loss_attack = LossBasedAttack(device=device)
-    loss_attack.calibrate_threshold(model, train_loader, test_loader)
-    
-    # Create combined dataset with targets for loss calculation
-    combined_dataset_with_targets = torch.utils.data.TensorDataset(combined_data, combined_targets)
-    combined_loader_with_targets = DataLoader(combined_dataset_with_targets, batch_size=128, shuffle=False)
-    
-    loss_results = loss_attack.infer_membership(model, combined_loader_with_targets)
-    results['loss_attack'] = loss_results
-    
-    # Calculate summary metrics
-    summary_results = {}
-    for attack_name, attack_results in results.items():
-        if 'accuracy' in attack_results:
-            summary_results[f'{attack_name}_accuracy'] = attack_results['accuracy']
-        if 'auc' in attack_results:
-            summary_results[f'{attack_name}_auc'] = attack_results['auc']
-    
-    # Use the best attack result for summary
-    best_attack_acc = max([summary_results.get(f'{name}_accuracy', 0) for name in ['threshold_attack', 'loss_attack']])
-    best_attack_auc = max([summary_results.get(f'{name}_auc', 0.5) for name in ['threshold_attack', 'loss_attack']])
-    
-    summary_results['attack_accuracy'] = best_attack_acc
-    summary_results['attack_auc'] = best_attack_auc
-    
-    # Save detailed results
-    results_file = output_dir / 'attack_results.json'
-    with open(results_file, 'w') as f:
-        # Convert numpy arrays to lists for JSON serialization
-        serializable_results = {}
-        for attack_name, attack_results in results.items():
-            serializable_results[attack_name] = {}
-            for key, value in attack_results.items():
-                if hasattr(value, 'tolist'):
-                    serializable_results[attack_name][key] = value.tolist()
-                else:
-                    serializable_results[attack_name][key] = value
-        
-        json.dump(serializable_results, f, indent=2)
-    
-    logger.info(f"Attack results saved to {results_file}")
-    
-    # Print summary
-    for attack_name, attack_results in results.items():
-        if 'accuracy' in attack_results:
-            logger.info(f"{attack_name} accuracy: {attack_results['accuracy']:.4f}")
-    
-    return summary_results
 
 
 def main():
@@ -479,8 +156,7 @@ def main():
                        help='Directory to save results')
     parser.add_argument('--model-name', type=str, default=None,
                        help='Name for saved model (auto-generated if not provided)')
-    parser.add_argument('--run-attacks', action='store_true',
-                       help='Run membership inference attacks after training')
+
     parser.add_argument('--no-visualizations', action='store_true',
                        help='Skip generating visualizations')
     
@@ -524,12 +200,10 @@ def main():
     
     logger.info(f"Train samples: {len(train_dataset)}, Test samples: {len(test_dataset)}")
     
-    # Create model
-    model = create_simple_model(args.dataset, num_classes)
-    logger.info(f"Created model with {sum(p.numel() for p in model.parameters())} parameters")
-    
-    # Create trainer
-    trainer = DPTrainer(model, device)
+    # Create trainer with appropriate architecture for dataset
+    input_channels = 1 if args.dataset == 'mnist' else 3
+    trainer = DPTrainer(num_classes, device, pretrained=False, input_channels=input_channels)
+    logger.info(f"Created model with {sum(p.numel() for p in trainer.model.parameters())} parameters")
     
     # Train model based on method
     logger.info(f"Training with method: {args.method}")
@@ -574,28 +248,19 @@ def main():
     logger.info("Training completed!")
     
     # Evaluate model
-    model.eval()
+    trainer.model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            outputs = model(data)
+            outputs = trainer.model(data)
             _, predicted = torch.max(outputs.data, 1)
             total += target.size(0)
             correct += (predicted == target).sum().item()
     
     model_accuracy = correct / total
     logger.info(f"Final model accuracy: {model_accuracy:.4f}")
-    
-    # Run membership inference attacks if requested
-    attack_results = {}
-    if args.run_attacks:
-        attack_summary = run_membership_inference_attacks(
-            model, train_loader, test_loader, device, output_dir
-        )
-        attack_summary['model_accuracy'] = model_accuracy
-        attack_results[str(args.epsilon) if args.method != 'standard' else 'standard'] = attack_summary
     
     # Save training history
     history_file = output_dir / f"{model_name}_history.json"
@@ -604,22 +269,26 @@ def main():
     
     # Generate visualizations
     if not args.no_visualizations:
-        create_dp_visualizations(history, attack_results, output_dir, model_name)
+        plot_training_metrics(history, output_dir, model_name)
     
     # Save final summary
+    # Get final test accuracy from history
+    final_test_acc = model_accuracy
+    if 'test_acc' in history and len(history['test_acc']) > 0:
+        final_test_acc = history['test_acc'][-1]
+    elif 'val_acc' in history and len(history['val_acc']) > 0:
+        final_test_acc = history['val_acc'][-1]
+    
     summary = {
         'method': args.method,
         'dataset': args.dataset,
         'epochs': args.epochs,
         'epsilon': args.epsilon if args.method != 'standard' else None,
         'delta': args.delta if args.method != 'standard' else None,
-        'final_test_accuracy': history.get('test_acc', [])[-1] if 'test_acc' in history else model_accuracy,
+        'final_test_accuracy': final_test_acc,
         'model_path': str(save_path),
         'device': device
     }
-    
-    if args.run_attacks and attack_results:
-        summary.update(attack_results[list(attack_results.keys())[0]])
     
     summary_file = output_dir / f"{model_name}_summary.json"
     with open(summary_file, 'w') as f:
