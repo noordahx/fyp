@@ -1,0 +1,17 @@
+# add .venv
+.venv
+notebooks/data
+notebooks/
+models/
+shadow_model.py
+data/
+catboost_info/
+assets/
+# all pycache
+**/__pycache__/
+shadow_models/
+shadow_indices/
+resources/
+attack_models/
+results/
+.DS_Store
