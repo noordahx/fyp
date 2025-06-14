@@ -7,9 +7,9 @@ to evaluate privacy risks.
 
 Usage:
     python scripts/mia_runner.py --model results/model.pt --dataset cifar10 --attack shadow
-    python scripts/mia_runner.py --model results/model.pt --dataset mnist --attack reference
-    python scripts/mia_runner.py --model results/model.pt --dataset cifar10 --attack loo
-    python scripts/mia_runner.py --model results/model.pt.0.pt --dataset mnist --attack all --attack-size 500 --num-shadows 2 --shadow-epochs 5
+    python scripts/mia_runner.py --model results/model.pt --dataset mnist --attack loss
+    python scripts/mia_runner.py --model results/model.pt --dataset cifar10 --attack shadow
+    python scripts/mia_runner.py --model results/model.pt --dataset mnist --attack all --attack-size 500 --num-shadows 2 --shadow-epochs 5
 """
 
 import argparse
@@ -89,43 +89,111 @@ def create_attack_splits(dataset, train_indices, test_indices, attack_size=1000)
 
 
 def evaluate_attack_performance(predictions, labels, save_path=None):
-    """Evaluate and visualize attack performance."""
-    # Calculate metrics
+    """Evaluate and visualize attack performance with proper threshold optimization."""
+    from sklearn.metrics import roc_curve
+    
+    # Ensure predictions are in [0,1] range
+    predictions = np.clip(predictions, 0.0, 1.0)
+    
+    # Calculate AUC
     auc = roc_auc_score(labels, predictions)
-    accuracy = accuracy_score(labels, predictions > 0.5)
+    
+    # Find optimal threshold using ROC curve
+    fpr, tpr, thresholds = roc_curve(labels, predictions)
+    # Optimal threshold maximizes (TPR - FPR)
+    optimal_idx = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+    
+    # Calculate accuracy with optimal threshold
+    optimal_accuracy = accuracy_score(labels, predictions >= optimal_threshold)
+    
+    # Calculate accuracy with 0.5 threshold for comparison
+    default_accuracy = accuracy_score(labels, predictions >= 0.5)
     
     # Calculate precision-recall curve
-    precision, recall, _ = precision_recall_curve(labels, predictions)
+    precision, recall, pr_thresholds = precision_recall_curve(labels, predictions)
+    
+    # Calculate additional metrics
+    from sklearn.metrics import classification_report, confusion_matrix
+    y_pred_optimal = (predictions >= optimal_threshold).astype(int)
+    
+    # Get balanced accuracy (accounts for class imbalance)
+    from sklearn.metrics import balanced_accuracy_score
+    balanced_acc = balanced_accuracy_score(labels, y_pred_optimal)
     
     logger.info(f"Attack AUC: {auc:.4f}")
-    logger.info(f"Attack Accuracy: {accuracy:.4f}")
+    logger.info(f"Attack Accuracy (optimal threshold {optimal_threshold:.3f}): {optimal_accuracy:.4f}")
+    logger.info(f"Attack Accuracy (default threshold 0.5): {default_accuracy:.4f}")
+    logger.info(f"Balanced Accuracy: {balanced_acc:.4f}")
+    
+    # Print confusion matrix for better understanding
+    cm = confusion_matrix(labels, y_pred_optimal)
+    tn, fp, fn, tp = cm.ravel()
+    logger.info(f"Confusion Matrix - TN: {tn}, FP: {fp}, FN: {fn}, TP: {tp}")
+    logger.info(f"True Positive Rate (Recall): {tp/(tp+fn):.4f}")
+    logger.info(f"True Negative Rate (Specificity): {tn/(tn+fp):.4f}")
     
     if save_path:
         save_path = Path(save_path)
         save_path.mkdir(parents=True, exist_ok=True)
         
-        # Plot ROC curve and precision-recall curve
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        # Create comprehensive plots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        fig.suptitle('Attack Performance Analysis', fontsize=16)
         
         # ROC curve
-        from sklearn.metrics import roc_curve
-        fpr, tpr, _ = roc_curve(labels, predictions)
-        ax1.plot(fpr, tpr, label=f'ROC (AUC = {auc:.3f})')
-        ax1.plot([0, 1], [0, 1], 'k--', label='Random')
+        ax1.plot(fpr, tpr, label=f'ROC (AUC = {auc:.3f})', linewidth=2)
+        ax1.plot([0, 1], [0, 1], 'k--', label='Random', alpha=0.5)
+        ax1.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', s=100, 
+                   label=f'Optimal (t={optimal_threshold:.3f})', zorder=5)
         ax1.set_xlabel('False Positive Rate')
         ax1.set_ylabel('True Positive Rate')
         ax1.set_title('ROC Curve')
         ax1.legend()
-        ax1.grid(True)
+        ax1.grid(True, alpha=0.3)
         
         # Precision-Recall curve
-        ax2.plot(recall, precision, label=f'PR Curve')
-        ax2.axhline(y=0.5, color='k', linestyle='--', label='Random')
+        ax2.plot(recall, precision, label=f'PR Curve', linewidth=2)
+        ax2.axhline(y=0.5, color='k', linestyle='--', label='Random', alpha=0.5)
         ax2.set_xlabel('Recall')
         ax2.set_ylabel('Precision')
         ax2.set_title('Precision-Recall Curve')
         ax2.legend()
-        ax2.grid(True)
+        ax2.grid(True, alpha=0.3)
+        
+        # Threshold vs Accuracy plot
+        accuracies = []
+        test_thresholds = np.linspace(0.01, 0.99, 50)
+        for t in test_thresholds:
+            acc = accuracy_score(labels, predictions >= t)
+            accuracies.append(acc)
+        
+        ax3.plot(test_thresholds, accuracies, linewidth=2)
+        ax3.axvline(x=optimal_threshold, color='red', linestyle='--', 
+                   label=f'Optimal: {optimal_threshold:.3f}')
+        ax3.axvline(x=0.5, color='orange', linestyle='--', 
+                   label='Default: 0.5')
+        ax3.set_xlabel('Threshold')
+        ax3.set_ylabel('Accuracy')
+        ax3.set_title('Accuracy vs Threshold')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # Prediction distribution
+        member_preds = predictions[labels == 1]
+        non_member_preds = predictions[labels == 0]
+        
+        ax4.hist(non_member_preds, bins=30, alpha=0.7, label='Non-members', density=True)
+        ax4.hist(member_preds, bins=30, alpha=0.7, label='Members', density=True)
+        ax4.axvline(x=optimal_threshold, color='red', linestyle='--', 
+                   label=f'Optimal threshold')
+        ax4.axvline(x=0.5, color='orange', linestyle='--', 
+                   label='Default threshold')
+        ax4.set_xlabel('Prediction Score')
+        ax4.set_ylabel('Density')
+        ax4.set_title('Prediction Distribution')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
         
         plt.tight_layout()
         plt.savefig(save_path / 'attack_performance.png', dpi=300, bbox_inches='tight')
@@ -134,10 +202,16 @@ def evaluate_attack_performance(predictions, labels, save_path=None):
         logger.info(f"Attack performance plots saved to {save_path}")
     
     return {
-        'auc': auc,
-        'accuracy': accuracy,
-        'precision': precision.tolist(),
-        'recall': recall.tolist()
+        'auc': float(auc),
+        'accuracy_optimal': float(optimal_accuracy),
+        'accuracy_default': float(default_accuracy),
+        'balanced_accuracy': float(balanced_acc),
+        'optimal_threshold': float(optimal_threshold),
+        'precision': [float(x) for x in precision],
+        'recall': [float(x) for x in recall],
+        'confusion_matrix': [[int(x) for x in row] for row in cm.tolist()],
+        'member_prediction_mean': float(np.mean(predictions[labels == 1])),
+        'non_member_prediction_mean': float(np.mean(predictions[labels == 0]))
     }
 
 
@@ -552,9 +626,14 @@ def main():
     for attack_name, results in all_results.items():
         print(f"\n{attack_name.upper()} ATTACK:")
         print(f"  AUC: {results['auc']:.4f}")
-        print(f"  Accuracy: {results['accuracy']:.4f}")
+        print(f"  Accuracy (optimal): {results['accuracy_optimal']:.4f}")
+        print(f"  Accuracy (default): {results['accuracy_default']:.4f}")
+        print(f"  Balanced Accuracy: {results['balanced_accuracy']:.4f}")
+        print(f"  Optimal Threshold: {results['optimal_threshold']:.3f}")
+        print(f"  Member Pred Mean: {results['member_prediction_mean']:.4f}")
+        print(f"  Non-member Pred Mean: {results['non_member_prediction_mean']:.4f}")
         
-        # Risk assessment
+        # Risk assessment based on AUC
         if results['auc'] > 0.8:
             risk = "HIGH"
         elif results['auc'] > 0.6:
@@ -562,6 +641,15 @@ def main():
         else:
             risk = "LOW"
         print(f"  Privacy Risk: {risk}")
+        
+        # Explain the difference between member and non-member predictions
+        pred_diff = results['member_prediction_mean'] - results['non_member_prediction_mean']
+        if pred_diff > 0.1:
+            print(f"  → Members have higher prediction scores (+{pred_diff:.3f})")
+        elif pred_diff < -0.1:
+            print(f"  → Non-members have higher prediction scores ({pred_diff:.3f})")
+        else:
+            print(f"  → Similar prediction scores (diff: {pred_diff:.3f})")
     
     print("\n" + "="*50)
 
