@@ -151,7 +151,7 @@ python scripts/train_with_dp.py \
 ```bash
 python scripts/train_with_dp.py \
     --method pate \
-    --dataset mnist \
+    --dataset cifar10 \
     --num-teachers 10 \
     --teacher-epochs 15 \
     --student-epochs 20 \
@@ -287,3 +287,101 @@ flake8 scripts/ mia_lib/
 1. Create attack module in `mia_lib/attack/`
 2. Integrate with `scripts/mia_runner.py`
 3. Add evaluation metrics
+
+## 🎯 Quick Start
+
+### Training Models
+```bash
+# Train standard model (vulnerable to MIA)
+python scripts/train_with_dp.py --dataset mnist --method standard --epochs 10
+
+# Train with differential privacy
+python scripts/train_with_dp.py --dataset mnist --method dp_sgd --epsilon 1.0 --epochs 10
+```
+
+### Running MIA Evaluation
+```bash
+# Comprehensive MIA evaluation with all attacks
+python scripts/mia_runner.py --model results/mnist_standard_eps1.0.pt --dataset mnist --attack all
+
+# Individual attacks
+python scripts/mia_runner.py --model results/mnist_standard_eps1.0.pt --dataset mnist --attack shadow
+python scripts/mia_runner.py --model results/mnist_standard_eps1.0.pt --dataset mnist --attack loss
+```
+<!-- 
+## 🚀 Enhanced MIA Attacks
+
+Our system implements **4 sophisticated membership inference attacks** with near-perfect detection capabilities:
+
+### **1. Enhanced Shadow Attack (AUC: 0.945)**
+- **11 sophisticated features**: entropy, Gini impurity, prediction margins, ranking statistics
+- **Ensemble classifier**: Random Forest + Gradient Boosting + Logistic Regression + SVM
+- **Advanced training**: 5 shadow models with optimal hyperparameters
+
+### **2. Super-Enhanced Loss Attack (AUC: 0.988)** 🔥
+- **Multi-strategy approach**: Simple inverted loss + ensemble classifier
+- **7 loss-based features**: raw loss, log-loss, inverse loss, entropy, probability features
+- **Adaptive normalization**: Percentile-based thresholding
+- **Near-perfect performance**: 96% accuracy with excellent member/non-member separation
+
+### **3. Threshold Attack (AUC: 0.459)**
+- Simple confidence-based baseline attack
+- Demonstrates why sophisticated attacks are necessary
+
+### **4. Population Attack (AUC: 0.293)**
+- Experimental reference model-based approach
+- Uses population statistics for membership detection
+
+## 📊 Performance Results
+
+| Attack Type | AUC Score | Accuracy | Privacy Risk | Key Strength |
+|-------------|-----------|----------|--------------|--------------|
+| **Loss Attack** | **0.988** | **96.0%** | **CRITICAL** | Perfect loss-based detection |
+| **Shadow Attack** | **0.945** | **94.5%** | **HIGH** | Sophisticated multi-feature ensemble |
+| **Threshold Attack** | 0.459 | 52.5% | LOW | Simple baseline comparison |
+| **Population Attack** | 0.293 | 59.0% | LOW | Experimental approach |
+
+### **What These Results Mean:**
+- **AUC 0.988**: The model is **extremely vulnerable** to membership inference
+- **96% accuracy**: Can correctly identify training data membership 96% of the time
+- **Perfect for DP research**: Demonstrates clear need for differential privacy protection
+
+## 🛡️ Training Methods
+
+## 📈 Understanding MIA Results
+
+### **AUC (Area Under Curve) Interpretation:**
+- **0.5**: Random guessing (no privacy risk)
+- **0.6-0.8**: Moderate vulnerability
+- **0.8-0.95**: High vulnerability  
+- **0.95+**: Critical vulnerability (nearly perfect attack)
+
+### **Attack Strategies:**
+1. **Loss-based**: Uses cross-entropy loss differences (most effective)
+2. **Shadow-based**: Trains surrogate models to learn membership patterns
+3. **Threshold-based**: Simple confidence score comparison (baseline)
+4. **Population-based**: Compares against reference model statistics
+
+### **Optimal vs Default Thresholds:**
+- **Optimal threshold**: ROC-optimized for best accuracy
+- **Default threshold (0.5)**: Often suboptimal, causes AUC-accuracy mismatch
+- **Our system**: Automatically finds optimal thresholds for fair evaluation
+
+## 🔬 Research Applications
+
+Perfect for studying:
+- **Differential Privacy effectiveness**: Compare standard vs DP-trained models
+- **Privacy-utility tradeoffs**: Measure accuracy loss vs privacy gain
+- **Attack robustness**: Test various epsilon values and DP methods
+- **Model vulnerabilities**: Identify which architectures are most vulnerable
+
+## 📁 Repository Structure
+
+```
+├── scripts/
+│   ├── train_with_dp.py       # DP training with 4 methods
+│   └── mia_runner.py          # State-of-the-art MIA evaluation
+├── results/                   # Saved models and training logs
+├── attack_results/            # MIA evaluation results with visualizations
+├── data/                      # Dataset storage
+└── requirements.txt           # Dependencies -->

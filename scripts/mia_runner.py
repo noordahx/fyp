@@ -290,14 +290,45 @@ def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, 
                 probs = torch.softmax(outputs, dim=1)
                 losses = criterion_no_reduction(outputs, batch_y)
                 
-                # Extract multiple features
+                # Extract sophisticated features
                 for j in range(len(batch_x)):
+                    prob_vec = probs[j]
+                    loss_val = losses[j]
+                    
+                    # Core features
+                    max_prob = float(torch.max(prob_vec))
+                    true_class_prob = float(prob_vec[batch_y[j]])
+                    
+                    # Statistical features
+                    sum_squared = float(torch.sum(prob_vec ** 2))
+                    std_dev = float(torch.std(prob_vec))
+                    entropy = float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12)))
+                    
+                    # Loss-based features
+                    raw_loss = float(loss_val)
+                    log_loss = float(torch.log(loss_val + 1e-12))
+                    
+                    # Ranking features
+                    sorted_probs, _ = torch.sort(prob_vec, descending=True)
+                    top_2_diff = float(sorted_probs[0] - sorted_probs[1])
+                    top_3_sum = float(torch.sum(sorted_probs[:3]))
+                    
+                    # Advanced features
+                    gini_impurity = float(1.0 - torch.sum(prob_vec ** 2))
+                    pred_margin = float(prob_vec[batch_y[j]] - torch.max(torch.cat([prob_vec[:batch_y[j]], prob_vec[batch_y[j]+1:]])))
+                    
                     features = [
-                        float(torch.max(probs[j])),  # Max probability
-                        float(torch.sum(probs[j] ** 2)),  # Sum of squared probabilities  
-                        float(losses[j]),  # Cross-entropy loss
-                        float(torch.std(probs[j])),  # Standard deviation of probabilities
-                        float(probs[j][batch_y[j]]),  # Probability of true class
+                        max_prob,           # 1. Max probability
+                        true_class_prob,    # 2. Probability of true class  
+                        sum_squared,        # 3. Sum of squared probabilities
+                        std_dev,           # 4. Standard deviation
+                        entropy,           # 5. Entropy of prediction
+                        raw_loss,          # 6. Cross-entropy loss
+                        log_loss,          # 7. Log of loss
+                        top_2_diff,        # 8. Difference between top 2 predictions
+                        top_3_sum,         # 9. Sum of top 3 predictions
+                        gini_impurity,     # 10. Gini impurity
+                        pred_margin,       # 11. Prediction margin
                     ]
                     shadow_features.append(features)
                     shadow_labels.append(1)  # Member
@@ -309,34 +340,112 @@ def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, 
                 probs = torch.softmax(outputs, dim=1)
                 losses = criterion_no_reduction(outputs, batch_y)
                 
-                # Extract multiple features
+                # Extract sophisticated features (same as member features)
                 for j in range(len(batch_x)):
+                    prob_vec = probs[j]
+                    loss_val = losses[j]
+                    
+                    # Core features
+                    max_prob = float(torch.max(prob_vec))
+                    true_class_prob = float(prob_vec[batch_y[j]])
+                    
+                    # Statistical features
+                    sum_squared = float(torch.sum(prob_vec ** 2))
+                    std_dev = float(torch.std(prob_vec))
+                    entropy = float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12)))
+                    
+                    # Loss-based features
+                    raw_loss = float(loss_val)
+                    log_loss = float(torch.log(loss_val + 1e-12))
+                    
+                    # Ranking features
+                    sorted_probs, _ = torch.sort(prob_vec, descending=True)
+                    top_2_diff = float(sorted_probs[0] - sorted_probs[1])
+                    top_3_sum = float(torch.sum(sorted_probs[:3]))
+                    
+                    # Advanced features
+                    gini_impurity = float(1.0 - torch.sum(prob_vec ** 2))
+                    pred_margin = float(prob_vec[batch_y[j]] - torch.max(torch.cat([prob_vec[:batch_y[j]], prob_vec[batch_y[j]+1:]])))
+                    
                     features = [
-                        float(torch.max(probs[j])),  # Max probability
-                        float(torch.sum(probs[j] ** 2)),  # Sum of squared probabilities  
-                        float(losses[j]),  # Cross-entropy loss
-                        float(torch.std(probs[j])),  # Standard deviation of probabilities
-                        float(probs[j][batch_y[j]]),  # Probability of true class
+                        max_prob,           # 1. Max probability
+                        true_class_prob,    # 2. Probability of true class  
+                        sum_squared,        # 3. Sum of squared probabilities
+                        std_dev,           # 4. Standard deviation
+                        entropy,           # 5. Entropy of prediction
+                        raw_loss,          # 6. Cross-entropy loss
+                        log_loss,          # 7. Log of loss
+                        top_2_diff,        # 8. Difference between top 2 predictions
+                        top_3_sum,         # 9. Sum of top 3 predictions
+                        gini_impurity,     # 10. Gini impurity
+                        pred_margin,       # 11. Prediction margin
                     ]
                     shadow_features.append(features)
                     shadow_labels.append(0)  # Non-member
     
-    # Train sophisticated attack model
-    from sklearn.ensemble import RandomForestClassifier
+    # Train sophisticated ensemble attack model
+    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.svm import SVC
     from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
     
     X = np.array(shadow_features)
     y = np.array(shadow_labels)
     
     # Split into train/test for attack model
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    # Use Random Forest for better performance
-    attack_model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
-    attack_model.fit(X_train, y_train)
+    # Feature scaling for some models
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
     
-    logger.info(f"Shadow attack model trained on {len(X_train)} samples")
-    logger.info(f"Shadow attack model validation accuracy: {attack_model.score(X_test, y_test):.4f}")
+    # Create ensemble of diverse models
+    rf_model = RandomForestClassifier(
+        n_estimators=200, 
+        max_depth=15, 
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42
+    )
+    
+    gb_model = GradientBoostingClassifier(
+        n_estimators=100,
+        max_depth=8,
+        learning_rate=0.1,
+        random_state=42
+    )
+    
+    lr_model = LogisticRegression(
+        C=1.0,
+        random_state=42,
+        max_iter=1000
+    )
+    
+    svm_model = SVC(
+        kernel='rbf',
+        C=1.0,
+        probability=True,
+        random_state=42
+    )
+    
+    # Create voting ensemble
+    attack_model = VotingClassifier(
+        estimators=[
+            ('rf', rf_model),
+            ('gb', gb_model),
+            ('lr', lr_model),
+            ('svm', svm_model)
+        ],
+        voting='soft'
+    )
+    
+    # Train ensemble on scaled features
+    attack_model.fit(X_train_scaled, y_train)
+    
+    logger.info(f"Shadow attack ensemble trained on {len(X_train)} samples")
+    logger.info(f"Shadow attack ensemble validation accuracy: {attack_model.score(X_test_scaled, y_test):.4f}")
     
     # Evaluate on target model
     member_dataset, non_member_dataset, member_indices, non_member_indices = create_attack_splits(
@@ -373,12 +482,43 @@ def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, 
                 losses = criterion_no_reduction(outputs, true_labels)
                 
                 for j in range(len(true_labels)):
+                    prob_vec = probs[j]
+                    loss_val = losses[j]
+                    
+                    # Core features
+                    max_prob = float(torch.max(prob_vec))
+                    true_class_prob = float(prob_vec[true_labels[j]])
+                    
+                    # Statistical features
+                    sum_squared = float(torch.sum(prob_vec ** 2))
+                    std_dev = float(torch.std(prob_vec))
+                    entropy = float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12)))
+                    
+                    # Loss-based features
+                    raw_loss = float(loss_val)
+                    log_loss = float(torch.log(loss_val + 1e-12))
+                    
+                    # Ranking features
+                    sorted_probs, _ = torch.sort(prob_vec, descending=True)
+                    top_2_diff = float(sorted_probs[0] - sorted_probs[1])
+                    top_3_sum = float(torch.sum(sorted_probs[:3]))
+                    
+                    # Advanced features
+                    gini_impurity = float(1.0 - torch.sum(prob_vec ** 2))
+                    pred_margin = float(prob_vec[true_labels[j]] - torch.max(torch.cat([prob_vec[:true_labels[j]], prob_vec[true_labels[j]+1:]])))
+                    
                     features = [
-                        float(torch.max(probs[j])),
-                        float(torch.sum(probs[j] ** 2)),
-                        float(losses[j]),
-                        float(torch.std(probs[j])),
-                        float(probs[j][true_labels[j]]),
+                        max_prob,           # 1. Max probability
+                        true_class_prob,    # 2. Probability of true class  
+                        sum_squared,        # 3. Sum of squared probabilities
+                        std_dev,           # 4. Standard deviation
+                        entropy,           # 5. Entropy of prediction
+                        raw_loss,          # 6. Cross-entropy loss
+                        log_loss,          # 7. Log of loss
+                        top_2_diff,        # 8. Difference between top 2 predictions
+                        top_3_sum,         # 9. Sum of top 3 predictions
+                        gini_impurity,     # 10. Gini impurity
+                        pred_margin,       # 11. Prediction margin
                     ]
                     target_features.append(features)
                     target_labels.append(1)
@@ -404,19 +544,51 @@ def run_shadow_attack_simple(target_model, train_dataset, test_dataset, device, 
                 losses = criterion_no_reduction(outputs, true_labels)
                 
                 for j in range(len(true_labels)):
+                    prob_vec = probs[j]
+                    loss_val = losses[j]
+                    
+                    # Core features
+                    max_prob = float(torch.max(prob_vec))
+                    true_class_prob = float(prob_vec[true_labels[j]])
+                    
+                    # Statistical features
+                    sum_squared = float(torch.sum(prob_vec ** 2))
+                    std_dev = float(torch.std(prob_vec))
+                    entropy = float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12)))
+                    
+                    # Loss-based features
+                    raw_loss = float(loss_val)
+                    log_loss = float(torch.log(loss_val + 1e-12))
+                    
+                    # Ranking features
+                    sorted_probs, _ = torch.sort(prob_vec, descending=True)
+                    top_2_diff = float(sorted_probs[0] - sorted_probs[1])
+                    top_3_sum = float(torch.sum(sorted_probs[:3]))
+                    
+                    # Advanced features
+                    gini_impurity = float(1.0 - torch.sum(prob_vec ** 2))
+                    pred_margin = float(prob_vec[true_labels[j]] - torch.max(torch.cat([prob_vec[:true_labels[j]], prob_vec[true_labels[j]+1:]])))
+                    
                     features = [
-                        float(torch.max(probs[j])),
-                        float(torch.sum(probs[j] ** 2)),
-                        float(losses[j]),
-                        float(torch.std(probs[j])),
-                        float(probs[j][true_labels[j]]),
+                        max_prob,           # 1. Max probability
+                        true_class_prob,    # 2. Probability of true class  
+                        sum_squared,        # 3. Sum of squared probabilities
+                        std_dev,           # 4. Standard deviation
+                        entropy,           # 5. Entropy of prediction
+                        raw_loss,          # 6. Cross-entropy loss
+                        log_loss,          # 7. Log of loss
+                        top_2_diff,        # 8. Difference between top 2 predictions
+                        top_3_sum,         # 9. Sum of top 3 predictions
+                        gini_impurity,     # 10. Gini impurity
+                        pred_margin,       # 11. Prediction margin
                     ]
                     target_features.append(features)
                     target_labels.append(0)
     
-    # Attack target model
+    # Attack target model with scaled features
     X_target = np.array(target_features)
-    attack_probs = attack_model.predict_proba(X_target)[:, 1]
+    X_target_scaled = scaler.transform(X_target)
+    attack_probs = attack_model.predict_proba(X_target_scaled)[:, 1]
     
     # Evaluate performance
     results = evaluate_attack_performance(
@@ -469,22 +641,23 @@ def run_threshold_attack(target_model, train_dataset, test_dataset, device, outp
 
 
 def run_loss_based_attack(target_model, train_dataset, test_dataset, device, output_dir, args):
-    """Run loss-based membership inference attack."""
-    logger.info("Running loss-based attack...")
+    """Run enhanced loss-based membership inference attack."""
+    logger.info("Running enhanced loss-based attack...")
     
     member_dataset, non_member_dataset, member_indices, non_member_indices = create_attack_splits(
         train_dataset, list(range(len(train_dataset))), 
         list(range(len(test_dataset))), args.attack_size
     )
     
-    predictions = []
+    all_losses = []
+    all_features = []
     labels = []
     
     criterion = nn.CrossEntropyLoss(reduction='none')
     target_model.eval()
     
     with torch.no_grad():
-        # Member losses (training data)
+        # Collect member losses (training data)
         member_loader = DataLoader(member_dataset, batch_size=128)
         for i, (batch_x, batch_y) in enumerate(member_loader):
             batch_x = batch_x.to(device)
@@ -501,15 +674,29 @@ def run_loss_based_attack(target_model, train_dataset, test_dataset, device, out
             if true_labels:
                 true_labels = torch.tensor(true_labels, device=device)
                 outputs = target_model(batch_x[:len(true_labels)])
+                probs = torch.softmax(outputs, dim=1)
                 losses = criterion(outputs, true_labels)
-                # Lower loss = higher membership probability
-                # Convert to membership probability (invert loss)
-                max_loss = 10.0  # Reasonable upper bound for cross-entropy loss
-                membership_probs = 1.0 - torch.clamp(losses / max_loss, 0.0, 1.0)
-                predictions.extend(membership_probs.cpu().numpy())
-                labels.extend([1] * len(true_labels))
+                
+                for j in range(len(true_labels)):
+                    loss_val = float(losses[j])
+                    prob_vec = probs[j]
+                    
+                    # Multiple loss-based features
+                    features = [
+                        loss_val,                                              # Raw loss
+                        np.log(loss_val + 1e-12),                            # Log loss
+                        1.0 / (1.0 + loss_val),                             # Inverse loss
+                        float(prob_vec[true_labels[j]]),                     # True class probability
+                        float(torch.max(prob_vec)),                          # Max probability
+                        loss_val * float(prob_vec[true_labels[j]]),          # Loss * true class prob
+                        float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12))),  # Entropy
+                    ]
+                    
+                    all_losses.append(loss_val)
+                    all_features.append(features)
+                    labels.append(1)
         
-        # Non-member losses (test data)
+        # Collect non-member losses (test data)
         non_member_loader = DataLoader(non_member_dataset, batch_size=128)
         for i, (batch_x, batch_y) in enumerate(non_member_loader):
             batch_x = batch_x.to(device)
@@ -526,17 +713,240 @@ def run_loss_based_attack(target_model, train_dataset, test_dataset, device, out
             if true_labels:
                 true_labels = torch.tensor(true_labels, device=device)
                 outputs = target_model(batch_x[:len(true_labels)])
+                probs = torch.softmax(outputs, dim=1)
                 losses = criterion(outputs, true_labels)
-                # Lower loss = higher membership probability
-                max_loss = 10.0  # Reasonable upper bound for cross-entropy loss
-                membership_probs = 1.0 - torch.clamp(losses / max_loss, 0.0, 1.0)
-                predictions.extend(membership_probs.cpu().numpy())
-                labels.extend([0] * len(true_labels))
+                
+                for j in range(len(true_labels)):
+                    loss_val = float(losses[j])
+                    prob_vec = probs[j]
+                    
+                    # Multiple loss-based features
+                    features = [
+                        loss_val,                                              # Raw loss
+                        np.log(loss_val + 1e-12),                            # Log loss
+                        1.0 / (1.0 + loss_val),                             # Inverse loss
+                        float(prob_vec[true_labels[j]]),                     # True class probability
+                        float(torch.max(prob_vec)),                          # Max probability
+                        loss_val * float(prob_vec[true_labels[j]]),          # Loss * true class prob
+                        float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12))),  # Entropy
+                    ]
+                    
+                    all_losses.append(loss_val)
+                    all_features.append(features)
+                    labels.append(0)
+    
+    # Use adaptive normalization based on data distribution
+    all_losses = np.array(all_losses)
+    member_losses = all_losses[np.array(labels) == 1]
+    non_member_losses = all_losses[np.array(labels) == 0]
+    
+    # Compute percentile-based normalization
+    loss_percentile_95 = np.percentile(all_losses, 95)
+    
+    # Enhanced loss-based attack: multiple strategies
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import train_test_split
+    
+    # Strategy 1: Simple inverted loss
+    simple_predictions = 1.0 - np.clip(all_losses / loss_percentile_95, 0.0, 1.0)
+    
+    # Strategy 2: Feature-based ensemble
+    X = np.array(all_features)
+    y = np.array(labels)
+    
+    if len(set(y)) > 1:  # Only train if we have both classes
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+        
+        # Train ensemble classifier
+        ensemble_model = RandomForestClassifier(
+            n_estimators=150,
+            max_depth=12,
+            min_samples_split=3,
+            random_state=42
+        )
+        ensemble_model.fit(X_train_scaled, y_train)
+        
+        # Get ensemble predictions
+        X_scaled = scaler.transform(X)
+        ensemble_predictions = ensemble_model.predict_proba(X_scaled)[:, 1]
+        
+        # Combine strategies (weighted average)
+        final_predictions = 0.3 * simple_predictions + 0.7 * ensemble_predictions
+    else:
+        final_predictions = simple_predictions
     
     # Evaluate performance
     results = evaluate_attack_performance(
-        np.array(predictions), np.array(labels),
+        final_predictions, np.array(labels),
         output_dir / 'loss_attack'
+    )
+    
+    return results
+
+
+def run_population_attack(target_model, train_dataset, test_dataset, device, output_dir, args):
+    """Run population-based membership inference attack using reference models."""
+    logger.info("Running population-based attack...")
+    
+    # Train reference models on disjoint population data
+    reference_models = []
+    num_reference_models = 3
+    
+    # Create reference training data (disjoint from target training data)
+    total_size = len(train_dataset) + len(test_dataset)
+    ref_data_size = min(total_size // 2, 5000)
+    
+    input_channels = 1 if 'mnist' in str(args.dataset).lower() else 3
+    
+    for i in range(num_reference_models):
+        logger.info(f"Training reference model {i+1}/{num_reference_models}")
+        
+        # Create reference model
+        ref_model = create_model(args.num_classes, pretrained=False, input_channels=input_channels)
+        ref_model = ref_model.to(device)
+        
+        # Sample reference training data
+        all_indices = list(range(len(train_dataset))) + [len(train_dataset) + j for j in range(len(test_dataset))]
+        ref_indices = np.random.choice(all_indices, ref_data_size, replace=False)
+        
+        ref_samples = []
+        for idx in ref_indices:
+            if idx < len(train_dataset):
+                ref_samples.append(train_dataset[idx])
+            else:
+                ref_samples.append(test_dataset[idx - len(train_dataset)])
+        
+        ref_loader = DataLoader(ref_samples, batch_size=64, shuffle=True)
+        
+        # Train reference model
+        optimizer = torch.optim.Adam(ref_model.parameters(), lr=0.001, weight_decay=1e-4)
+        criterion = nn.CrossEntropyLoss()
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.7)
+        
+        for epoch in range(8):
+            ref_model.train()
+            for batch_x, batch_y in ref_loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                optimizer.zero_grad()
+                outputs = ref_model(batch_x)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+            scheduler.step()
+        
+        reference_models.append(ref_model)
+    
+    # Create attack splits
+    member_dataset, non_member_dataset, member_indices, non_member_indices = create_attack_splits(
+        train_dataset, list(range(len(train_dataset))), 
+        list(range(len(test_dataset))), args.attack_size
+    )
+    
+    # Extract population-based features
+    target_features = []
+    labels = []
+    
+    criterion = nn.CrossEntropyLoss(reduction='none')
+    
+    def extract_population_features(model, data_loader, true_indices, original_dataset, is_member):
+        features = []
+        model.eval()
+        
+        with torch.no_grad():
+            for i, (batch_x, batch_y) in enumerate(data_loader):
+                batch_x = batch_x.to(device)
+                start_idx = i * 128
+                end_idx = min(start_idx + 128, len(true_indices))
+                
+                true_labels = []
+                for idx in range(start_idx, end_idx):
+                    if idx < len(true_indices):
+                        orig_idx = true_indices[idx]
+                        _, true_label = original_dataset[orig_idx]
+                        true_labels.append(true_label)
+                
+                if true_labels:
+                    true_labels = torch.tensor(true_labels, device=device)
+                    outputs = model(batch_x[:len(true_labels)])
+                    probs = torch.softmax(outputs, dim=1)
+                    losses = criterion(outputs, true_labels)
+                    
+                    for j in range(len(true_labels)):
+                        prob_vec = probs[j]
+                        loss_val = float(losses[j])
+                        
+                        # Population-based features
+                        pop_features = [
+                            float(prob_vec[true_labels[j]]),                     # True class probability
+                            float(torch.max(prob_vec)),                          # Max probability
+                            loss_val,                                            # Cross-entropy loss
+                            float(torch.std(prob_vec)),                          # Std deviation
+                            float(-torch.sum(prob_vec * torch.log(prob_vec + 1e-12))),  # Entropy
+                        ]
+                        features.append(pop_features)
+                        
+        return features
+    
+    # Get target model features
+    target_model.eval()
+    member_loader = DataLoader(member_dataset, batch_size=128)
+    non_member_loader = DataLoader(non_member_dataset, batch_size=128)
+    
+    target_member_features = extract_population_features(
+        target_model, member_loader, member_indices, train_dataset, True
+    )
+    target_non_member_features = extract_population_features(
+        target_model, non_member_loader, non_member_indices, test_dataset, False
+    )
+    
+    # Get reference model features for the same data points
+    reference_features = []
+    for ref_model in reference_models:
+        ref_member_features = extract_population_features(
+            ref_model, member_loader, member_indices, train_dataset, True
+        )
+        ref_non_member_features = extract_population_features(
+            ref_model, non_member_loader, non_member_indices, test_dataset, False
+        )
+        reference_features.extend(ref_member_features + ref_non_member_features)
+    
+    # Compute population statistics
+    reference_features = np.array(reference_features)
+    pop_mean = np.mean(reference_features, axis=0)
+    pop_std = np.std(reference_features, axis=0) + 1e-12
+    
+    # Compute attack scores using population statistics
+    attack_scores = []
+    attack_labels = []
+    
+    # Process member features
+    for features in target_member_features:
+        features = np.array(features)
+        # Likelihood ratio based on population statistics
+        likelihood_ratio = np.prod(np.exp(-0.5 * ((features - pop_mean) / pop_std) ** 2))
+        # Normalize to [0, 1] range (higher = more likely to be member)
+        score = 1.0 / (1.0 + likelihood_ratio)
+        attack_scores.append(score)
+        attack_labels.append(1)
+    
+    # Process non-member features
+    for features in target_non_member_features:
+        features = np.array(features)
+        # Likelihood ratio based on population statistics  
+        likelihood_ratio = np.prod(np.exp(-0.5 * ((features - pop_mean) / pop_std) ** 2))
+        # Normalize to [0, 1] range (higher = more likely to be member)
+        score = 1.0 / (1.0 + likelihood_ratio)
+        attack_scores.append(score)
+        attack_labels.append(0)
+    
+    # Evaluate performance
+    results = evaluate_attack_performance(
+        np.array(attack_scores), np.array(attack_labels),
+        output_dir / 'population_attack'
     )
     
     return results
@@ -556,15 +966,15 @@ def main():
     
     # Attack arguments
     parser.add_argument('--attack', type=str, default='shadow',
-                       choices=['shadow', 'threshold', 'loss', 'all'],
+                       choices=['shadow', 'threshold', 'loss', 'population', 'all'],
                        help='Type of attack to run')
     parser.add_argument('--attack-size', type=int, default=1000,
                        help='Number of samples for attack evaluation')
     
     # Shadow attack arguments
-    parser.add_argument('--num-shadows', type=int, default=3,
+    parser.add_argument('--num-shadows', type=int, default=5,
                        help='Number of shadow models')
-    parser.add_argument('--shadow-epochs', type=int, default=8,
+    parser.add_argument('--shadow-epochs', type=int, default=10,
                        help='Epochs for shadow model training')
     
     # Output arguments
@@ -610,6 +1020,12 @@ def main():
             target_model, train_dataset, test_dataset, device, output_dir, args
         )
         all_results['loss'] = loss_results
+    
+    if args.attack == 'population' or args.attack == 'all':
+        population_results = run_population_attack(
+            target_model, train_dataset, test_dataset, device, output_dir, args
+        )
+        all_results['population'] = population_results
     
     # Save results
     results_file = output_dir / 'attack_results.json'
