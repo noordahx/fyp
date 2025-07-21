@@ -1,0 +1,48 @@
+# Optimized Configuration for Best DP-SGD Performance
+model:
+  architecture: "resnet18_dp"  # DP-compatible ResNet18-like architecture
+  num_classes: 10
+  pretrained: false
+  dropout_rate: 0.1            # Reduced dropout for better utility
+
+# Dataset configuration optimized for DP
+data:
+  dataset: "cifar10"
+  train_batch_size: 1024       # Even larger batch size for best privacy-utility tradeoff
+  eval_batch_size: 512
+  num_workers: 4
+
+# Attack configuration
+attack:
+  attack_type: "all"
+  shadow:
+    num_shadow_models: 16      # More shadow models for better attacks
+    shadow_train_size: 10000   # Larger shadow training sets
+  threshold:
+    threshold: 0.5
+  loss:
+    threshold: 0.5
+  population:
+    num_reference: 5
+    reference_size: 5000
+
+# Defense configuration
+defense:
+  method: "opacus_dp_sgd"
+  epsilon: 1.0                 # Will be overridden by command line
+  delta: 1e-5
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+  max_physical_batch_size: 256  # Larger for better memory usage
+
+# Training configuration - optimized for maximum accuracy
+training:
+  epochs: 30                   # More epochs for convergence
+  learning_rate: 0.02          # Higher LR to overcome noise
+  optimizer: "sgd"
+  weight_decay: 0.0001
+
+# Output configuration
+output:
+  save_dir: "./results/optimized"
+  visualizations: true
