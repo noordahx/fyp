@@ -28,10 +28,19 @@ def plot_training_metrics(history, save_path, method="standard", epsilon=None):
     plt.grid(True, alpha=0.3)
     
     plt.subplot(2, 2, 3)
-    plt.plot(history['lr'])
-    plt.title('Learning Rate')
-    plt.xlabel('Epochs')
-    plt.ylabel('Learning Rate')
+    if 'lr' in history:
+        plt.plot(history['lr'])
+        plt.title('Learning Rate')
+        plt.xlabel('Epochs')
+        plt.ylabel('Learning Rate')
+    else:
+        # If no learning rate history, show training progress instead
+        epochs = range(1, len(history['train_loss']) + 1)
+        plt.plot(epochs, [0.01] * len(epochs), 'g--', label='Fixed LR')
+        plt.title('Learning Rate (Fixed)')
+        plt.xlabel('Epochs')
+        plt.ylabel('Learning Rate')
+        plt.legend()
     plt.grid(True, alpha=0.3)
     
     if 'epsilon' in history and method != 'standard':

@@ -337,7 +337,7 @@ class OpacusDPSGD(DPMethod):
         logger.info(f"Sample rate: {sample_rate:.6f}")
         
         # Training loop with proper memory management
-        history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': [], 'epsilon': []}
+        history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': [], 'epsilon': [], 'lr': []}
         
         for epoch in range(epochs):
             self.model.train()
@@ -383,6 +383,7 @@ class OpacusDPSGD(DPMethod):
             history['test_loss'].append(test_loss)
             history['test_acc'].append(test_acc)
             history['epsilon'].append(current_epsilon)
+            history['lr'].append(lr)  # Track learning rate
             
             logger.info(f'Epoch {epoch+1}/{epochs}: '
                        f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%, '
