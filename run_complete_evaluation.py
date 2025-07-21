@@ -110,21 +110,21 @@ def train_target_models(config_path, output_base_dir, logger):
         },
         {
             'name': 'dp_sgd_eps3',
-            'method': 'dp_sgd_custom',
+            'method': 'opacus_dp_sgd',
             'epsilon': 3.0,
-            'description': 'DP-SGD with ε=3.0 (low privacy)'
+            'description': 'Opacus DP-SGD with ε=3.0 (low privacy)'
         },
         {
             'name': 'dp_sgd_eps1',
-            'method': 'dp_sgd_custom', 
+            'method': 'opacus_dp_sgd', 
             'epsilon': 1.0,
-            'description': 'DP-SGD with ε=1.0 (medium privacy)'
+            'description': 'Opacus DP-SGD with ε=1.0 (medium privacy)'
         },
         {
             'name': 'dp_sgd_eps0_5',
-            'method': 'dp_sgd_custom',
+            'method': 'opacus_dp_sgd',
             'epsilon': 0.5,
-            'description': 'DP-SGD with ε=0.5 (high privacy)'
+            'description': 'Opacus DP-SGD with ε=0.5 (high privacy)'
         },
         {
             'name': 'output_pert_eps3',

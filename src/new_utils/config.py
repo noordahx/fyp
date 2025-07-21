@@ -57,6 +57,7 @@ class DefenseConfig:
     delta: float = 1e-5
     max_grad_norm: float = 1.0
     noise_multiplier: float = 1.0
+    max_physical_batch_size: int = 128  # New parameter for Opacus memory management
 
 @dataclass
 class TrainingConfig:

@@ -59,7 +59,7 @@ Examples:
 
     # Override configuration with command line arguments
     if args.method:
-        valid_methods = ['standard', 'dp_sgd_custom', 'output_perturbation']
+        valid_methods = ['standard', 'dp_sgd_custom', 'opacus_dp_sgd', 'output_perturbation']
         if args.method not in valid_methods:
             raise ValueError(f"Unknown method: {args.method}. Available methods: {valid_methods}")
         config.defense.method = args.method

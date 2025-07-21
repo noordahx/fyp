@@ -5,7 +5,10 @@ def plot_training_metrics(history, save_path, method="standard", epsilon=None):
     
     plt.subplot(2, 2, 1)
     plt.plot(history['train_acc'], label='Train Accuracy')
-    plt.plot(history['val_acc'], label='Validation Accuracy')
+    if 'val_acc' in history:
+        plt.plot(history['val_acc'], label='Validation Accuracy')
+    elif 'test_acc' in history:
+        plt.plot(history['test_acc'], label='Test Accuracy')
     plt.title(f'{method.upper()} - Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy (%)')

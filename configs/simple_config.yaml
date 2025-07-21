@@ -1,5 +1,5 @@
 model:
-  architecture: "resnet18" # TODO: support more models (add dynamic weights preload)
+  architecture: "resnet18_dp" # DP-compatible ResNet18-like architecture
   num_classes: 10
   pretrained: false
   dropout_rate: 0.5
@@ -40,11 +40,12 @@ attack:
     reference_size: 1000
 
 defense:
-  method: "dp_sgd_custom"  # Options: standard, dp_sgd_custom, output_perturbation
+  method: "opacus_dp_sgd"  # Options: standard, dp_sgd_custom, opacus_dp_sgd, output_perturbation  
   epsilon: 3.0
   delta: 1e-5
   max_grad_norm: 1.0
   noise_multiplier: 1.0
+  max_physical_batch_size: 128
 
 training:
   epochs: 2

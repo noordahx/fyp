@@ -61,8 +61,8 @@ class StandardTraining(DPMethod):
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
                     # Asynchronous GPU transfer for better performance
-                batch_x = batch_x.to(self.device, non_blocking=True)  
-                batch_y = batch_y.to(self.device, non_blocking=True)
+                    batch_x = batch_x.to(self.device, non_blocking=True)  
+                    batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
@@ -227,8 +227,8 @@ class DPSGDCustom(DPMethod):
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
                     # Asynchronous GPU transfer for better performance
-                batch_x = batch_x.to(self.device, non_blocking=True)  
-                batch_y = batch_y.to(self.device, non_blocking=True)
+                    batch_x = batch_x.to(self.device, non_blocking=True)  
+                    batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
@@ -270,6 +270,165 @@ class DPSGDCustom(DPMethod):
                 logger.warning(f"Approaching privacy budget limit: ε={current_epsilon:.4f}/{epsilon:.4f}")
 
         return history
+
+class OpacusDPSGD(DPMethod):
+    """DP-SGD implementation using Opacus library for optimal performance and correctness."""
+    
+    def __init__(self, model, device):
+        super().__init__(model, device)
+        self.name = "opacus_dp_sgd"
+    
+    def train(self, train_loader, test_loader, epochs, lr, save_path, **kwargs) -> Dict[str, Any]:
+        from opacus import PrivacyEngine
+        from opacus.validators import ModuleValidator
+        from opacus.utils.batch_memory_manager import BatchMemoryManager
+        
+        epsilon = float(kwargs['epsilon'])
+        delta = float(kwargs['delta'])
+        max_grad_norm = float(kwargs.get('max_grad_norm', 1.0))
+        noise_multiplier = float(kwargs.get('noise_multiplier', 1.0))
+        max_physical_batch_size = int(kwargs.get('max_physical_batch_size', 128))
+        
+        logger.info(f"Training with Opacus DP-SGD (ε={epsilon}, δ={delta}, C={max_grad_norm})")
+        logger.info(f"Noise multiplier: {noise_multiplier}, Max physical batch size: {max_physical_batch_size}")
+        
+        # Fix model for DP compatibility 
+        logger.info("Validating and fixing model for DP compatibility...")
+        errors = ModuleValidator.validate(self.model, strict=False)
+        if errors:
+            logger.warning(f"Model compatibility issues found: {len(errors)} layers")
+            # Use strict mode to fix all issues including residual connections
+            try:
+                self.model = ModuleValidator.fix(self.model, strict=True)
+                logger.info("✅ Model automatically fixed (strict mode)")
+            except Exception as e:
+                logger.warning(f"Strict fix failed: {e}")
+                # Fall back to standard fix
+                self.model = ModuleValidator.fix(self.model)
+                logger.info("✅ Model automatically fixed (standard mode)")
+        else:
+            logger.info("✅ Model is already DP-compatible")
+        
+        self.model = self.model.to(self.device)
+        
+        # Initialize optimizer
+        optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+        criterion = nn.CrossEntropyLoss()
+        
+        # Initialize privacy engine
+        privacy_engine = PrivacyEngine()
+        
+        self.model, optimizer, train_loader = privacy_engine.make_private_with_epsilon(
+            module=self.model,
+            optimizer=optimizer,
+            data_loader=train_loader,
+            epochs=epochs,
+            target_epsilon=epsilon,
+            target_delta=delta,
+            max_grad_norm=max_grad_norm,
+        )
+        
+        logger.info(f"✅ Privacy engine initialized")
+        logger.info(f"Using noise multiplier: {optimizer.noise_multiplier:.4f}")
+        # Get sample rate from data loader info  
+        original_batch_size = 256  # From config
+        sample_rate = original_batch_size / len(train_loader.dataset)
+        logger.info(f"Sample rate: {sample_rate:.6f}")
+        
+        # Training loop with proper memory management
+        history = {'train_loss': [], 'train_acc': [], 'test_loss': [], 'test_acc': [], 'epsilon': []}
+        
+        for epoch in range(epochs):
+            self.model.train()
+            running_loss = 0.0
+            correct = 0
+            total = 0
+            
+            # Use BatchMemoryManager for efficient memory usage
+            with BatchMemoryManager(
+                data_loader=train_loader, 
+                max_physical_batch_size=max_physical_batch_size, 
+                optimizer=optimizer
+            ) as memory_safe_data_loader:
+                
+                for batch_idx, (data, target) in enumerate(memory_safe_data_loader):
+                    data, target = data.to(self.device), target.to(self.device)
+                    
+                    optimizer.zero_grad()
+                    output = self.model(data)
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+                    
+                    running_loss += loss.item()
+                    _, predicted = torch.max(output.data, 1)
+                    total += target.size(0)
+                    correct += (predicted == target).sum().item()
+                    
+                    if batch_idx % 100 == 0:
+                        current_epsilon = privacy_engine.accountant.get_epsilon(delta)
+                        logger.info(f'Epoch {epoch+1}/{epochs}, Batch {batch_idx}, '
+                                  f'Loss: {loss.item():.4f}, ε: {current_epsilon:.4f}')
+            
+            train_loss = running_loss / len(train_loader)
+            train_acc = 100. * correct / total
+            
+            # Test evaluation
+            test_loss, test_acc = self._evaluate(test_loader, criterion)
+            current_epsilon = privacy_engine.accountant.get_epsilon(delta)
+            
+            history['train_loss'].append(train_loss)
+            history['train_acc'].append(train_acc)
+            history['test_loss'].append(test_loss)
+            history['test_acc'].append(test_acc)
+            history['epsilon'].append(current_epsilon)
+            
+            logger.info(f'Epoch {epoch+1}/{epochs}: '
+                       f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%, '
+                       f'Test Loss: {test_loss:.4f}, Test Acc: {test_acc:.2f}%, '
+                       f'ε: {current_epsilon:.4f}')
+            
+            # Early stopping if privacy budget exceeded
+            if current_epsilon > epsilon:
+                logger.warning(f"Privacy budget exceeded (ε={current_epsilon:.4f} > {epsilon}), stopping training")
+                break
+        
+        # Save model
+        final_epsilon = privacy_engine.accountant.get_epsilon(delta)
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'epsilon': final_epsilon,
+            'delta': delta,
+            'max_grad_norm': max_grad_norm,
+            'noise_multiplier': optimizer.noise_multiplier,
+            'sample_rate': sample_rate,
+            'epochs_trained': epoch + 1,
+        }, save_path)
+        
+        logger.info(f"Model saved to {save_path}")
+        logger.info(f"Final privacy cost: ε={final_epsilon:.4f}, δ={delta}")
+        
+        return history
+    
+    def _evaluate(self, test_loader, criterion):
+        """Evaluate model on test set."""
+        self.model.eval()
+        test_loss = 0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(self.device), target.to(self.device)
+                output = self.model(data)
+                test_loss += criterion(output, target).item()
+                _, predicted = torch.max(output.data, 1)
+                total += target.size(0)
+                correct += (predicted == target).sum().item()
+        
+        test_loss /= len(test_loader)
+        test_acc = 100. * correct / total
+        return test_loss, test_acc
 
 class OutputPerturbation(DPMethod):
     """Output perturbation method for differential privacy."""
@@ -324,8 +483,8 @@ class OutputPerturbation(DPMethod):
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
                     # Asynchronous GPU transfer for better performance
-                batch_x = batch_x.to(self.device, non_blocking=True)  
-                batch_y = batch_y.to(self.device, non_blocking=True)
+                    batch_x = batch_x.to(self.device, non_blocking=True)  
+                    batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
@@ -391,6 +550,7 @@ def get_dp_method(method_name, model, device):
     methods = {
         'standard': StandardTraining,
         'dp_sgd_custom': DPSGDCustom,
+        'opacus_dp_sgd': OpacusDPSGD,
         'output_perturbation': OutputPerturbation,
     }
     if method_name not in methods:
