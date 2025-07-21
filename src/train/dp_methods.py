@@ -311,8 +311,9 @@ class OpacusDPSGD(DPMethod):
         
         self.model = self.model.to(self.device)
         
-        # Initialize optimizer
-        optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
+        # Initialize optimizer - SGD works best with DP training
+        weight_decay = float(kwargs.get('weight_decay', 1e-4))
+        optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay)
         criterion = nn.CrossEntropyLoss()
         
         # Initialize privacy engine with RDP accountant (more stable than PRV)

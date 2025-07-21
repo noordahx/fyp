@@ -17,7 +17,10 @@ def plot_training_metrics(history, save_path, method="standard", epsilon=None):
     
     plt.subplot(2, 2, 2)
     plt.plot(history['train_loss'], label='Train Loss')
-    plt.plot(history['val_loss'], label='Validation Loss')
+    if 'val_loss' in history:
+        plt.plot(history['val_loss'], label='Validation Loss')
+    elif 'test_loss' in history:
+        plt.plot(history['test_loss'], label='Test Loss')
     plt.title(f'{method.upper()} - Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')

@@ -8,7 +8,7 @@ model:
 # Dataset configuration
 data:
   dataset: "cifar10"  # Options: cifar10, cifar100, mnist
-  train_batch_size: 256
+  train_batch_size: 512     # Larger batch size for better privacy-utility tradeoff
   eval_batch_size: 512
   num_workers: 4
 
@@ -52,9 +52,9 @@ defense:
 
 # Training configuration - optimized for DP training
 training:
-  epochs: 10               # Reduced for DP compatibility - prevents privacy accounting numerical issues
-  learning_rate: 0.001
-  optimizer: "adam"
+  epochs: 20               # Increased for better accuracy - DP models need more training
+  learning_rate: 0.01      # Higher LR for DP training (noise requires stronger signal)
+  optimizer: "sgd"         # SGD works better with DP than Adam
   weight_decay: 0.0001
 
 # Output configuration
