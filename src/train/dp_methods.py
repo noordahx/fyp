@@ -42,7 +42,9 @@ class StandardTraining(DPMethod):
             self.model.train()
             train_loss, train_correct, train_total = 0.0, 0, 0
             for batch_x, batch_y in train_loader:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)  
+                batch_y = batch_y.to(self.device, non_blocking=True)
                 optimizer.zero_grad()
                 outputs = self.model(batch_x)
                 loss = criterion(outputs, batch_y)
@@ -58,7 +60,9 @@ class StandardTraining(DPMethod):
             val_loss, val_correct, val_total = 0.0, 0, 0
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
-                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                    # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)  
+                batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
@@ -134,7 +138,9 @@ class DPSGDCustom(DPMethod):
             train_loss, train_correct, train_total = 0.0, 0, 0
             
             for batch_idx, (batch_x, batch_y) in enumerate(train_loader):
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)
+                batch_y = batch_y.to(self.device, non_blocking=True)
                 batch_size = batch_x.size(0)
                 
                 optimizer.zero_grad()
@@ -184,12 +190,12 @@ class DPSGDCustom(DPMethod):
                 # Add noise to accumulated gradients
                 for param in self.model.parameters():
                     if hasattr(param, 'accumulated_grad') and param.accumulated_grad is not None:
-                        noise = torch.normal(
-                            mean=0.0,
-                            std=noise_multiplier * max_grad_norm,
-                            size=param.accumulated_grad.shape,
-                            device=self.device
-                        )
+                        # Generate noise directly on GPU with proper dtype
+                        noise = torch.randn(
+                            param.accumulated_grad.shape,
+                            device=self.device,
+                            dtype=param.accumulated_grad.dtype
+                        ) * (noise_multiplier * max_grad_norm)
                         param.grad = param.accumulated_grad / batch_size + noise / batch_size
                         # Clean up
                         delattr(param, 'accumulated_grad')
@@ -220,7 +226,9 @@ class DPSGDCustom(DPMethod):
             val_loss, val_correct, val_total = 0.0, 0, 0
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
-                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                    # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)  
+                batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()
@@ -290,7 +298,9 @@ class OutputPerturbation(DPMethod):
             train_loss, train_correct, train_total = 0.0, 0, 0
             
             for batch_x, batch_y in train_loader:
-                batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)  
+                batch_y = batch_y.to(self.device, non_blocking=True)
                 
                 optimizer.zero_grad()
                 outputs = self.model(batch_x)
@@ -313,7 +323,9 @@ class OutputPerturbation(DPMethod):
             val_loss, val_correct, val_total = 0.0, 0, 0
             with torch.no_grad():
                 for batch_x, batch_y in test_loader:
-                    batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+                    # Asynchronous GPU transfer for better performance
+                batch_x = batch_x.to(self.device, non_blocking=True)  
+                batch_y = batch_y.to(self.device, non_blocking=True)
                     outputs = self.model(batch_x)
                     loss = criterion(outputs, batch_y)
                     val_loss += loss.item()

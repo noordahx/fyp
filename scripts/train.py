@@ -89,6 +89,18 @@ Examples:
         
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
+    
+    # GPU memory and performance info
+    if device.type == 'cuda':
+        gpu_name = torch.cuda.get_device_name(device)
+        gpu_memory = torch.cuda.get_device_properties(device).total_memory / 1e9
+        logger.info(f"GPU: {gpu_name}")
+        logger.info(f"GPU Memory: {gpu_memory:.1f} GB")
+        logger.info(f"GPU Memory Allocated: {torch.cuda.memory_allocated(device) / 1e9:.3f} GB")
+        
+        # Enable optimizations
+        torch.backends.cudnn.benchmark = True  # Optimize for consistent input sizes
+        logger.info("GPU optimizations enabled: cudnn.benchmark=True")
 
     # Run the main training routine
     run_training(config=config, device=device)

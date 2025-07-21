@@ -28,11 +28,22 @@ def run_training(config, device):
     train_dataset, test_dataset = get_dataset(config.data.dataset, './data')
     logger.info(f"Dataset loaded successfully: Train={len(train_dataset)}, Test={len(test_dataset)}")
     
+    # Optimized DataLoaders for GPU training
+    is_cuda = device.type == 'cuda'
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=config.data.train_batch_size, shuffle=True, num_workers=config.data.num_workers
+        train_dataset, 
+        batch_size=config.data.train_batch_size, 
+        shuffle=True, 
+        num_workers=max(config.data.num_workers, 4 if is_cuda else 0),
+        pin_memory=is_cuda,
+        drop_last=True  # Consistent batch sizes for DP training
     )
     test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=config.data.eval_batch_size, shuffle=False, num_workers=config.data.num_workers
+        test_dataset, 
+        batch_size=config.data.eval_batch_size, 
+        shuffle=False, 
+        num_workers=max(config.data.num_workers, 4 if is_cuda else 0),
+        pin_memory=is_cuda
     )
 
     logger.info(f"Creating model: {config.model.architecture}")
