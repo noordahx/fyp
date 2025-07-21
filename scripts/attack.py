@@ -18,7 +18,7 @@ import torch
 
 from src.attacks.base import get_attack_by_name
 from src.data import get_dataset
-from src.new_utils.models import create_model
+from src.models import create_model
 from src.new_utils.config import Config
 
 
@@ -71,15 +71,30 @@ def main():
     train_dataset, test_dataset = get_dataset(config.data.dataset, './data')
     logging.info(f"Loaded datasets: {len(train_dataset)} train samples, {len(test_dataset)} test samples")
     
-    model = create_model(config.model.num_classes, 
-                         config.model.pretrained,
-                         input_channels=1 if config.data.dataset == 'mnist' else 3)
-    
+    # Load the checkpoint first to detect model architecture
     checkpoint = torch.load(args.model, map_location=device)
     if "model_state_dict" in checkpoint:
-        model.load_state_dict(checkpoint["model_state_dict"])
+        saved_state_dict = checkpoint["model_state_dict"]
     else:
-        model.load_state_dict(checkpoint)
+        saved_state_dict = checkpoint
+    
+    # Detect if this is an old ResNet18 model or new DP-compatible model
+    has_resnet_keys = any(key.startswith(('conv1.', 'layer1.', 'layer2.')) for key in saved_state_dict.keys())
+    has_sequential_keys = any(key.startswith(('0.', '1.', '4.')) for key in saved_state_dict.keys())
+    
+    if has_resnet_keys and not has_sequential_keys:
+        # Old ResNet18 model - use backward compatibility
+        logger.info("Detected old ResNet18 model, using backward compatibility mode")
+        from src.new_utils.models import create_model as create_legacy_model
+        model = create_legacy_model(config.model.num_classes, 
+                                  config.model.pretrained,
+                                  input_channels=1 if config.data.dataset == 'mnist' else 3)
+    else:
+        # New DP-compatible model
+        logger.info("Detected DP-compatible model")
+        model = create_model(config.model)
+    
+    model.load_state_dict(saved_state_dict)
     model = model.to(device)
     model.eval()
     
