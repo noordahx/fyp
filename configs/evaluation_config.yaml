@@ -1,0 +1,66 @@
+# Evaluation Configuration - Optimized for Complete Pipeline
+# This config is designed for training multiple models and running comprehensive attacks
+
+model:
+  architecture: "resnet18"
+  num_classes: 10
+  pretrained: true
+  dropout_rate: 0.2
+
+# Dataset configuration
+data:
+  dataset: "cifar10"  # Options: cifar10, cifar100, mnist
+  train_batch_size: 128      # Smaller batch size for faster training
+  eval_batch_size: 256
+  num_workers: 2             # Conservative for stability
+
+# Attack configuration - optimized for comprehensive evaluation
+attack:
+  attack_type: "all"  # Will run all attacks
+  features:
+    - "max_prob"
+    - "true_class_prob"
+    - "entropy"
+    - "loss"
+    - "margin"
+  
+  # Shadow attack specific - balanced for quality vs speed
+  shadow:
+    num_shadows: 4             # Reduced for faster execution
+    epochs: 8                  # Sufficient for good shadow models  
+    batch_size: 128
+    learning_rate: 0.001
+    shadow_train_size: 3000    # Manageable dataset size
+    shadow_eval_size: 1500     # Proportional to train size
+  
+  # Loss attack specific
+  loss:
+    threshold: 0.5
+  
+  # Population attack specific
+  population:
+    num_reference: 3
+    reference_size: 3000       # Balanced reference population
+
+# Defense configuration - will be overridden by evaluation script
+defense:
+  method: "standard"
+  epsilon: 1.0
+  delta: 1e-5
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+
+# Training configuration - optimized for multiple model training
+training:
+  epochs: 20                   # Reduced for faster training pipeline
+  learning_rate: 0.001
+  optimizer: "adam"
+  weight_decay: 0.0001
+
+# Output configuration
+output:
+  save_dir: "./results/evaluation"
+  visualizations: true
+
+# General
+seed: 42

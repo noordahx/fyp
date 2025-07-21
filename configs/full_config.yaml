@@ -1,0 +1,65 @@
+# Optimized Model configuration
+model:
+  architecture: "resnet18"
+  num_classes: 10
+  pretrained: true
+  dropout_rate: 0.2
+
+# Dataset configuration
+data:
+  dataset: "cifar10"  # Options: cifar10, cifar100, mnist
+  train_batch_size: 256
+  eval_batch_size: 512
+  num_workers: 4
+
+# Attack configuration - optimized for reasonable runtime
+attack:
+  attack_type: "all"  # Will run all attacks
+  features:
+    - "max_prob"
+    - "true_class_prob"
+    - "entropy"
+    - "loss"
+    - "margin"
+  
+  # Shadow attack specific - reduced for faster execution
+  shadow:
+    num_shadows: 8       # Reduced from 32 - still good attack quality
+    epochs: 10           # Reduced from 20 - sufficient for good models
+    batch_size: 128
+    learning_rate: 0.001
+    shadow_train_size: 5000   # Reduced from 10000 - faster training
+    shadow_eval_size: 2500    # Reduced from 5000 - faster evaluation
+  
+  # Loss attack specific
+  loss:
+    threshold: 0.5
+  
+  # Population attack specific - optimized
+  population:
+    num_reference: 5
+    reference_size: 5000      # Reduced from 10000 - faster baseline computation
+
+# Defense configuration - for each method we'll test
+defense:
+  # Will be overridden by command line args
+  method: "dp_sgd_custom"
+  epsilon: 1.0  # We'll test 0.1, 1.0, 3.0, 10.0, inf
+  delta: 1e-5
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+
+# Training configuration - reduced for faster testing
+training:
+  epochs: 30               # Reduced from 50 - still sufficient for good models
+  learning_rate: 0.001
+  optimizer: "adam"
+  weight_decay: 0.0001
+
+# Output configuration
+output:
+  save_dir: "./results/full"
+  visualizations: true
+
+# General
+seed: 42

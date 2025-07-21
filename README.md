@@ -33,20 +33,13 @@ fyp/
 ```
 
 ## Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd fyp
-```
-
-2. Create a virtual environment:
+1. Create a virtual environment:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```

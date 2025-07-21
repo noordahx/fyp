@@ -1,0 +1,59 @@
+model:
+  architecture: "resnet18" # TODO: support more models (add dynamic weights preload)
+  num_classes: 10
+  pretrained: false
+  dropout_rate: 0.5
+
+data:
+  dataset: "cifar10"
+  train_size: 5000
+  test_size: 1000
+  train_batch_size: 64
+  eval_batch_size: 128
+  num_workers: 2
+
+attack:
+  attack_type: "shadow"  # Options: shadow, threshold, loss, population
+  
+  # extracted from target model to later train attack models
+  features:
+    - "max_prob"
+    - "true_class_prob"
+    - "entropy"
+
+  # Attack S
+  shadow:
+    num_shadows: 16
+    epochs: 3
+    batch_size: 64
+    learning_rate: 0.001
+    shadow_train_size: 1000
+    shadow_eval_size: 500
+  
+  #Attack L
+  loss:
+    threshold: 0.5
+  
+  #Attack P
+  population:
+    num_reference: 2
+    reference_size: 1000
+
+defense:
+  method: "dp_sgd_custom"  # Options: standard, dp_sgd_custom, output_perturbation
+  epsilon: 3.0
+  delta: 1e-5
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+
+training:
+  epochs: 2
+  learning_rate: 0.001
+  optimizer: "adam"
+  weight_decay: 0.0001
+
+output:
+  save_dir: "./results/simple_test/dp_sgd_custom"
+  visualizations: true
+
+seed: 42

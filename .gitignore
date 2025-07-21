@@ -16,3 +16,6 @@ results/
 training.log
 fyp.zip
 attack_results/
+ignore/
+CLAUDE.md
+test_fixes.py
