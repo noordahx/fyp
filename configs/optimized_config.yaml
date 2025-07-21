@@ -15,11 +15,19 @@ data:
 # Attack configuration
 attack:
   attack_type: "all"
+  features:
+    - "max_prob"
+    - "true_class_prob"
+    - "entropy"
+    - "loss"
+    - "margin"
   shadow:
-    num_shadow_models: 16      # More shadow models for better attacks
-    shadow_train_size: 10000   # Larger shadow training sets
-  threshold:
-    threshold: 0.5
+    num_shadows: 16           # More shadow models for better attacks  
+    epochs: 5                 # Good balance of speed vs quality
+    batch_size: 128
+    learning_rate: 0.001
+    shadow_train_size: 10000  # Larger shadow training sets
+    shadow_eval_size: 5000
   loss:
     threshold: 0.5
   population:
