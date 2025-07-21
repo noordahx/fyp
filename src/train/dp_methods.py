@@ -315,8 +315,8 @@ class OpacusDPSGD(DPMethod):
         optimizer = optim.SGD(self.model.parameters(), lr=lr, momentum=0.9, weight_decay=1e-4)
         criterion = nn.CrossEntropyLoss()
         
-        # Initialize privacy engine
-        privacy_engine = PrivacyEngine()
+        # Initialize privacy engine with RDP accountant (more stable than PRV)
+        privacy_engine = PrivacyEngine(accountant='rdp')
         
         self.model, optimizer, train_loader = privacy_engine.make_private_with_epsilon(
             module=self.model,

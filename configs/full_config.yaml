@@ -1,8 +1,8 @@
 # Optimized Model configuration
 model:
-  architecture: "resnet18"
+  architecture: "resnet18_dp"  # DP-compatible ResNet18-like architecture
   num_classes: 10
-  pretrained: true
+  pretrained: false  # DP-compatible model doesn't use pretrained weights
   dropout_rate: 0.2
 
 # Dataset configuration
@@ -43,15 +43,16 @@ attack:
 # Defense configuration - for each method we'll test
 defense:
   # Will be overridden by command line args
-  method: "dp_sgd_custom"
+  method: "opacus_dp_sgd"  # Updated to use Opacus implementation
   epsilon: 1.0  # We'll test 0.1, 1.0, 3.0, 10.0, inf
   delta: 1e-5
   max_grad_norm: 1.0
   noise_multiplier: 1.0
+  max_physical_batch_size: 128  # New parameter for Opacus memory management
 
-# Training configuration - reduced for faster testing
+# Training configuration - optimized for DP training
 training:
-  epochs: 30               # Reduced from 50 - still sufficient for good models
+  epochs: 10               # Reduced for DP compatibility - prevents privacy accounting numerical issues
   learning_rate: 0.001
   optimizer: "adam"
   weight_decay: 0.0001
