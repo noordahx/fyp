@@ -45,7 +45,7 @@ defense:
 
 # Training configuration - optimized for maximum accuracy
 training:
-  epochs: 30                   # More epochs for convergence
+  epochs: 80                   # Increased epochs for best possible convergence
   learning_rate: 0.02          # Higher LR to overcome noise
   optimizer: "sgd"
   weight_decay: 0.0001

@@ -30,15 +30,17 @@ class StandardTraining(DPMethod):
         self.name = "standard"
     
     def train(self, train_loader, test_loader, epochs, lr, save_path, **kwargs) -> Dict[str, Any]:
-        logger.info("Training standard model (no DP)")
+        # Use more epochs for standard training since there are no privacy constraints
+        standard_epochs = max(epochs * 2, 50)  # At least 50 epochs for good baseline
+        logger.info(f"Training standard model (no DP) for {standard_epochs} epochs")
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=max(1, epochs//3), gamma=0.1)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=max(1, standard_epochs//3), gamma=0.1)
         
         history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': [], 'lr': []}
         best_acc = 0.0
         
-        for epoch in range(epochs):
+        for epoch in range(standard_epochs):
             self.model.train()
             train_loss, train_correct, train_total = 0.0, 0, 0
             for batch_x, batch_y in train_loader:
@@ -83,7 +85,7 @@ class StandardTraining(DPMethod):
                 torch.save({'model_state_dict': self.model.state_dict()}, save_path)
             
             scheduler.step()
-            logger.info(f"Epoch {epoch+1}/{epochs}: Train Acc: {train_acc:.2f}%, Val Acc: {val_acc:.2f}%")
+            logger.info(f"Epoch {epoch+1}/{standard_epochs}: Train Acc: {train_acc:.2f}%, Val Acc: {val_acc:.2f}%")
         return history
 
 class DPSGDCustom(DPMethod):
