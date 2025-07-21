@@ -81,6 +81,23 @@ def main():
     # Detect if this is an old ResNet18 model or new DP-compatible model
     has_resnet_keys = any(key.startswith(('conv1.', 'layer1.', 'layer2.')) for key in saved_state_dict.keys())
     has_sequential_keys = any(key.startswith(('0.', '1.', '4.')) for key in saved_state_dict.keys())
+    has_opacus_wrapped_keys = any(key.startswith('_module.') for key in saved_state_dict.keys())
+    
+    if has_opacus_wrapped_keys:
+        # Opacus wrapped model - unwrap the keys
+        logger.info("Detected Opacus-wrapped model, unwrapping...")
+        unwrapped_state_dict = {}
+        for key, value in saved_state_dict.items():
+            if key.startswith('_module.'):
+                new_key = key[8:]  # Remove '_module.' prefix
+                unwrapped_state_dict[new_key] = value
+            else:
+                unwrapped_state_dict[key] = value
+        saved_state_dict = unwrapped_state_dict
+        
+        # Re-check what type of model this is after unwrapping
+        has_resnet_keys = any(key.startswith(('conv1.', 'layer1.', 'layer2.')) for key in saved_state_dict.keys())
+        has_sequential_keys = any(key.startswith(('0.', '1.', '4.')) for key in saved_state_dict.keys())
     
     if has_resnet_keys and not has_sequential_keys:
         # Old ResNet18 model - use backward compatibility
